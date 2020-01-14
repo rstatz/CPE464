@@ -3,9 +3,10 @@
 
 #include <stdint.h>
 
+#define PREAMBLE 0xAAAAAAAAAAAAAAAB
+
 typedef struct Ethernet_header {
-    uint64_t preamble: 56;
-    uint8_t delim: 8;
+    uint64_t preamble: 64;
     
     uint64_t dest_mac: 48;
     uint64_t src_mac: 48;
@@ -47,7 +48,7 @@ typedef struct TCP_header {
     uint16_t dest_port: 16;
 
     uint32_t seq_number: 32;
-    uint32_t ack: 32;
+    uint32_t ack_dat: 32;
     
     uint8_t offset: 4;
     uint8_t reserved: 3;
@@ -75,3 +76,4 @@ typedef struct UDP_header {
     uint16_t checksum;
 } __attribute__((packed)) UDP_header;
 
+#endif
