@@ -6,14 +6,12 @@
 #define PREAMBLE 0xAAAAAAAAAAAAAAAB
 
 typedef struct Ethernet_header {
-    uint64_t preamble: 64;
-    
     uint64_t dest_mac: 48;
     uint64_t src_mac: 48;
 
-    uint32_t tag_802_1Q: 32; // Optional, don't know about this
+    //uint32_t tag_802_1Q: 32;
     
-    uint16_t length: 16;
+    uint16_t ether_type: 16;
 } __attribute__((packed)) Ethernet_header;
 
 typedef struct ARP_header {
@@ -42,6 +40,28 @@ typedef struct ICMP_header {
 
     uint32_t payload;
 } __attribute__((packed)) ICMP_header;
+
+typedef struct IPV4_header {
+    uint8_t ihl: 4;
+    uint8_t version: 4; // Reversed due to endianness
+    uint8_t tos: 6;
+    uint8_t ecn: 2;
+    
+    uint16_t len;
+    
+    uint16_t id;
+    
+    uint8_t flags: 3;
+    uint16_t frag_off: 13;
+
+    uint8_t ttl;
+    uint8_t protocol;
+
+    uint16_t header_checksum;
+
+    uint32_t src_ip;
+    uint32_t dest_ip;   
+} __attribute__((packed)) IPV4_header;
 
 typedef struct TCP_header {
     uint16_t src_port: 16;
