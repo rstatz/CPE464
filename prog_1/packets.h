@@ -44,8 +44,8 @@ typedef struct ICMP_header {
 typedef struct IPV4_header {
     uint8_t ihl: 4;
     uint8_t version: 4; // Reversed due to endianness
-    uint8_t tos: 6;
-    uint8_t ecn: 2;
+    uint8_t tos_ecn;
+    
     
     uint16_t len;
     
@@ -57,30 +57,41 @@ typedef struct IPV4_header {
     uint8_t ttl;
     uint8_t protocol;
 
-    uint16_t header_checksum;
+    uint16_t checksum;
 
     uint32_t src_ip;
     uint32_t dest_ip;   
 } __attribute__((packed)) IPV4_header;
+
+typedef struct p_TCP_header {
+    uint32_t src_ip;
+    uint32_t dest_ip;
+        
+    uint8_t res;
+    uint8_t protocol;
+    
+    uint16_t len;
+} __attribute__((packed)) p_TCP_header;
 
 typedef struct TCP_header {
     uint16_t src_port: 16;
     uint16_t dest_port: 16;
 
     uint32_t seq_number: 32;
-    uint32_t ack_dat: 32;
+    uint32_t ack_number: 32;
     
-    uint8_t offset: 4;
     uint8_t reserved: 3;
     uint8_t ns: 1;
-    uint8_t cwr: 1;
-    uint8_t ece: 1;
-    uint8_t urg: 1;
-    uint8_t ack: 1;
-    uint8_t psh: 1;
-    uint8_t rst: 1;
-    uint8_t syn: 1;
+    uint8_t offset: 4;
+ 
     uint8_t fin: 1;
+    uint8_t syn: 1;
+    uint8_t rst: 1;
+    uint8_t psh: 1; 
+    uint8_t ack: 1;
+    uint8_t urg: 1;
+    uint8_t ece: 1;
+    uint8_t cwr: 1;
 
     uint16_t window_size: 16;
 
