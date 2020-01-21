@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
 #include <pcap/pcap.h>
 #include <arpa/inet.h>
@@ -24,6 +25,12 @@
 
 #define ICMP_REQUEST 8
 #define ICMP_REPLY 0
+
+#define HTTP_PORT 80
+#define TELNET_PORT 23
+#define POP3_PORT 110
+#define SMTP_PORT 25
+#define FTP_PORT 20
 
 union ip_in_addr {
     uint64_t d_ip;
@@ -211,18 +218,44 @@ uint16_t parse_arp_packet(void* pkt, void** payload) {
     return 0;
 }
 
+void portntoa(uint16_t port, char* out) {
+    switch (port) {
+        case(HTTP_PORT) :
+            strcpy(out, "HTTP");
+            break;
+        case(TELNET_PORT) :
+            strcpy(out, "Telnet");
+            break;
+        case(FTP_PORT) :
+            strcpy(out, "FTP");
+            break;
+        case(POP3_PORT) :
+            strcpy(out, "POP3");
+            break;
+        case(SMTP_PORT) :
+            strcpy(out, "SMTP");
+            break;
+        default:
+            sprintf(out, ": %d", port);
+    }
+}
+
 uint16_t parse_udp_packet(void* pkt, void** payload) {
     UDP_header* udph = (UDP_header*) pkt;
     uint16_t src_port, dest_port;
+    char s_src_port[10], s_dest_port[10];
 
     src_port = ntohs(udph->src_port);
     dest_port = ntohs(udph->dest_port);
+    
+    portntoa(src_port, s_src_port);
+    portntoa(dest_port, s_dest_port);
 
     *payload = pkt + 1; 
 
     printf("\n\tUDP Header\n");
-    printf("\t\tSource Port: %d\n", src_port);
-    printf("\t\tDest Port: %d\n", dest_port);
+    printf("\t\tSource Port: %s\n", s_src_port);
+    printf("\t\tDest Port: %s\n", s_dest_port);
 
     return udph->length;
 }
@@ -237,13 +270,26 @@ uint16_t calc_tcp_cksum(TCP_header* tcph) {
 uint16_t parse_tcp_packet(void* pkt, void** payload) {
     TCP_header* tcph = (TCP_header*)pkt;
     uint16_t c_checksum;
+    uint16_t src_port, dest_port;
+    char s_src_port[10], s_dest_port[10]; 
     
+    src_port = ntohs(tcph->src_port);
+    dest_port = ntohs(tcph->dest_port);
+
+    portntoa(src_port, s_src_port);
+    portntoa(dest_port, s_dest_port);
+
     printf("\n\tTCP Header\n");
-    printf("\t\tSource Port: %d\n", ntohs(tcph->src_port));
-    printf("\t\tDest Port: %d\n", ntohs(tcph->dest_port));
+    printf("\t\tSource Port: %s\n", s_src_port);
+    printf("\t\tDest Port: %s\n", s_dest_port);
     
-    printf("\t\tSequence: %u\n", ntohl(tcph->seq_number));
-    printf("\t\tACK Number: %u\n", ntohl(tcph->ack_number));
+    printf("\t\tSequence Number: %u\n", ntohl(tcph->seq_number));
+
+    // Only if ACK flag is set
+    if (tcph->ack)
+        printf("\t\tACK Number: %u\n", ntohl(tcph->ack_number));
+    else
+        printf("\t\tACK Number: <not valid>\n");
 
     printf("\t\tACK Flag: %s\n", (tcph->ack ? "Yes" : "No"));
     printf("\t\tSYN Flag: %s\n", (tcph->syn ? "Yes" : "No"));
