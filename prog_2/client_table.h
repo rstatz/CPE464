@@ -19,7 +19,7 @@ Client_Table* new_ctable();
 
 void new_client(Client_Table*, int, char*);
 
-int rm_client(Client_Table*, int);
+void rm_client(Client_Table*, int);
 
 int get_socket(Client_Table* table, char* handle);
 

@@ -39,7 +39,7 @@ void new_client(Client_Table* table, int sock, char* handle) {
     table->entries = ll_append(table->entries, ci);
 }
 
-int rm_client(Client_Table* table, int sock) {
+void rm_client(Client_Table* table, int sock) {
     table->entries = ll_sremove(table->entries, (void*)&sock, (*match_socket), (*delete_ci));
 }
 

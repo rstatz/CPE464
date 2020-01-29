@@ -19,7 +19,7 @@ LLNode* ll_append(LLNode* list, void* data) {
 
 // removes a link (will destroy head of list upon removal)
 void ll_remove(LLNode* list, void (*rm_data)(void*)) {
-    if (list = NULL)
+    if (list == NULL)
         return;
 
     (*rm_data)(list->data);
