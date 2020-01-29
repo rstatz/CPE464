@@ -52,10 +52,10 @@ int get_socket(Client_Table* table, char* handle) {
     return ci->sock;
 }
 
-void* get_stream(Client_Table* table) {
+void* ct_get_stream(Client_Table* table) {
     return ll_get_stream(table->entries);
 }
 
-Client_Info* get_next_entry(void** stream) {
+Client_Info* ct_get_next_entry(void** stream) {
     return (Client_Info*)ll_get_next_entry(stream);
 }

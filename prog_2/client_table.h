@@ -24,7 +24,7 @@ void rm_client(Client_Table*, int);
 int get_socket(Client_Table* table, char* handle);
 
 // Functions for parsing through table entries
-void* get_stream(Client_Table*);
-Client_Info* get_next_entry(void** stream); // Returns NULL when reached end
+void* ct_get_stream(Client_Table*);
+Client_Info* ct_get_next_entry(void** stream); // Returns NULL when reached end
 
 #endif
