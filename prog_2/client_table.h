@@ -17,7 +17,9 @@ typedef struct Client_Table {
 
 Client_Table* new_ctable();
 
-void new_client(Client_Table*, int, char*);
+void new_client(Client_Table*, int);
+
+void ct_set_handle(Client_Table*, int, char*);
 
 void rm_client(Client_Table*, int);
 

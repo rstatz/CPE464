@@ -30,13 +30,21 @@ Client_Table* new_ctable() {
     return table;
 }
 
-void new_client(Client_Table* table, int sock, char* handle) {
+void new_client(Client_Table* table, int sock) {
     Client_Info* ci = malloc(sizeof(Client_Info));
 
     ci->sock = sock;
-    strcpy(ci->handle, handle);
+    ci->handle[0] = '\0';
 
     table->entries = ll_append(table->entries, ci);
+}
+
+void ct_set_handle(Client_Table* table, int sock, char* handle) {
+    Client_Info* ci;
+    
+    ci = ll_search(table->entries, (void*)&sock, (*match_socket));
+
+    strcpy(ci->handle, handle);
 }
 
 void rm_client(Client_Table* table, int sock) {

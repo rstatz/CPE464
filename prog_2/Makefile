@@ -12,7 +12,7 @@ client: client.c networks.o gethostbyname6.o
 	$(CC) $(CFLAGS) -o client client.c networks.o gethostbyname6.o $(LIBS)
 
 server: server.c networks.o gethostbyname6.o
-	$(CC) $(CFLAGS) -o server server.c client_table.c chat_test.c linkedlist.c networks.o gethostbyname6.o $(LIBS)
+	$(CC) $(CFLAGS) -o server server.c client_table.c chat_packets.c linkedlist.c networks.o gethostbyname6.o $(LIBS)
 
 .c.o:
 	gcc -c $(CFLAGS) $< -o $@ $(LIBS)
