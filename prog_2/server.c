@@ -87,7 +87,7 @@ void read_client_socket(Client_Table* ctable, int sock, int* max_fd, fd_set* rfd
             break;
         case(FLAG_MSG) :
             break;
-        case(FLAG_EXIT) :
+        case(FLAG_EXIT_REQ) :
             break;
         case(FLAG_HLIST_REQ) :
             break;
