@@ -11,10 +11,10 @@
 
 // for the server side
 int tcpServerSetup(int portNumber);
-int tcpAccept(int server_socket, int debugFlag);
+int tcpAccept(int server_socket);
 
 // for the client side
-int tcpClientSetup(char * serverName, char * port, int debugFlag);
+int tcpClientSetup(char * serverName, char * port);
 
 
 #endif

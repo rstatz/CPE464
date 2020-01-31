@@ -9,7 +9,7 @@ LIBS =
 all:   client server
 
 client: client.c networks.o gethostbyname6.o
-	$(CC) $(CFLAGS) -o client client.c networks.o gethostbyname6.o $(LIBS)
+	$(CC) $(CFLAGS) -o client client.c chat_packets.c networks.o gethostbyname6.o $(LIBS)
 
 server: server.c networks.o gethostbyname6.o
 	$(CC) $(CFLAGS) -o server server.c client_table.c chat_packets.c linkedlist.c networks.o gethostbyname6.o $(LIBS)

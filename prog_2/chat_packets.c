@@ -17,7 +17,7 @@
 #define MAX_HEAD_NUM_PACKET_LENGTH_BYTES (4 + sizeof(Chat_header))
 #define MAX_MSG_PACKET_LENGTH_BYTES (806 + sizeof(Chat_header))
 
-int chat_recv(int socket, void* buf, int length, int flags) {
+static int chat_recv(int socket, void* buf, int length, int flags) {
     int out;
     
     if((out = recv(socket, buf, length, flags)) == -1)
@@ -26,7 +26,7 @@ int chat_recv(int socket, void* buf, int length, int flags) {
     return out;
 }
 
-int chat_send(int socket, void* buf, int length, int flags) {
+static int chat_send(int socket, void* buf, int length, int flags) {
     int out;
 
     if ((out = send(socket, buf, length, flags)) == -1)
@@ -35,7 +35,6 @@ int chat_send(int socket, void* buf, int length, int flags) {
     return out;
 }
 
-// returns length of remainder of packet
 int read_chat_header(int socket, int* pdu_length) {
     int bytes;
     Chat_header head;

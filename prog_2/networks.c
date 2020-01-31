@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#include "debug.h"
 #include "networks.h"
 #include "gethostbyname6.h"
 
@@ -69,7 +70,7 @@ int tcpServerSetup(int portNumber)
 // This function waits for a client to ask for services.  It returns
 // the client socket number.   
 
-int tcpAccept(int server_socket, int debugFlag)
+int tcpAccept(int server_socket)
 {
 	struct sockaddr_in6 clientInfo;   
 	int clientInfoSize = sizeof(clientInfo);
@@ -81,17 +82,14 @@ int tcpAccept(int server_socket, int debugFlag)
 		exit(-1);
 	}
 	
-	if (debugFlag)
-	{
-		printf("Client accepted.  Client IP: %s Client Port Number: %d\n",  
-				getIPAddressString(clientInfo.sin6_addr.s6_addr), ntohs(clientInfo.sin6_port));
-	}
+	DEBUG_PRINT("Client accepted.  Client IP: %s Client Port Number: %d\n",  
+			getIPAddressString(clientInfo.sin6_addr.s6_addr), ntohs(clientInfo.sin6_port));
 	
 
 	return(client_socket);
 }
 
-int tcpClientSetup(char * serverName, char * port, int debugFlag)
+int tcpClientSetup(char * serverName, char * port)
 {
 	// This is used by the client to connect to a server using TCP
 	
@@ -106,10 +104,7 @@ int tcpClientSetup(char * serverName, char * port, int debugFlag)
 		exit(-1);
 	}
 	
-	if (debugFlag)
-	{
-		printf("Connecting to server on port number %s\n", port);
-	}
+	DEBUG_PRINT("Connecting to server on port number %s\n", port);
 	
 	// setup the server structure
 	server.sin6_family = AF_INET6;
@@ -128,10 +123,7 @@ int tcpClientSetup(char * serverName, char * port, int debugFlag)
 		exit(-1);
 	}
 
-	if (debugFlag)
-	{
-		printf("Connected to %s IP: %s Port Number: %d\n", serverName, getIPAddressString(ipAddress), atoi(port));
-	}
+	DEBUG_PRINT("Connected to %s IP: %s Port Number: %d\n", serverName, getIPAddressString(ipAddress), atoi(port));
 	
 	return socket_num;
 }

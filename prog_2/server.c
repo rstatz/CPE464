@@ -1,15 +1,15 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/select.h>
 
+#include "debug.h"
 #include "networks.h"
 //#include "chat_test.h"
 //#include "chat_parse.h"
 #include "client_table.h"
 #include "chat_packets.h"
-
-#define DEBUG_FLAG 1
 
 #define CHAT_SOCKET_CLOSE 0
 
@@ -33,7 +33,7 @@ int check_server_socket(int server_sock, int* active_fds, int* max_fd, fd_set* r
 
     if (FD_ISSET(server_sock, rfds)) {
         // add new client
-        new_sock = tcpAccept(server_sock, DEBUG_FLAG);
+        new_sock = tcpAccept(server_sock);
         FD_SET(new_sock, rfds);
 
         *max_fd = (new_sock >= *max_fd) ? new_sock + 1 : *max_fd;
@@ -51,7 +51,7 @@ int get_max_fd(Client_Table* ctable) {
 
     stream = ct_get_stream(ctable);
 
-    while((ci = ct_get_next_entry(stream)) != NULL)
+    while((ci = ct_get_next_entry(&stream)) != NULL)
         max_fd = (ci->sock >= max_fd) ? ci->sock + 1 : max_fd;
 
     return max_fd;
@@ -62,11 +62,12 @@ void chat_handle_req(Client_Table* ctable, int sock) {
     // if invalid or in use
     //      send err
     // else
-    //      send ack
+    //      sennd ack
+    DEBUG_PRINT("Received client handle\n");
 }
 
 void chat_broadcast(Client_Table* ctable, int sock) {
-
+    
 }
 
 void read_client_socket(Client_Table* ctable, int sock, int* max_fd, fd_set* rfds) {
@@ -77,6 +78,7 @@ void read_client_socket(Client_Table* ctable, int sock, int* max_fd, fd_set* rfd
     switch(flag) {
         case(CHAT_SOCKET_CLOSE) :
             FD_CLR(sock, rfds);
+            close(sock);
             *max_fd = get_max_fd(ctable) + 1;
             break;
         case(FLAG_HANDLE_REQ) :
@@ -93,7 +95,7 @@ void read_client_socket(Client_Table* ctable, int sock, int* max_fd, fd_set* rfd
             break;
         default:
             // TODO: figure out what to do
-            fprintf(stderr, "Server: Unrecognized Packet");
+            fprintf(stderr, "Server: Unrecognized Packet\n");
             //trash_packet(sock, pdu_length - sizeof(Chat_header));
             break;
     }
@@ -106,7 +108,7 @@ void check_client_sockets(Client_Table* ctable, int active_fds, int* max_fd, fd_
     stream = ct_get_stream(ctable);
 
     while (active_fds > 0) {
-        entry = ct_get_next_entry(stream);
+        entry = ct_get_next_entry(&stream);
         
         if (FD_ISSET(entry->sock, rfds)) {
             read_client_socket(ctable, entry->sock, max_fd, rfds);
