@@ -17,13 +17,17 @@ typedef struct Client_Table {
 
 Client_Table* new_ctable();
 
+int get_num_clients(Client_Table*);
+
 void new_client(Client_Table*, int);
 
 void ct_set_handle(Client_Table*, int, char*);
 
 void rm_client(Client_Table*, int);
 
-int get_socket(Client_Table* table, char* handle);
+char* ct_get_handle(Client_Table*, int sock);
+
+int ct_get_socket(Client_Table* table, char* handle);
 
 // Functions for parsing through table entries
 void* ct_get_stream(Client_Table*);

@@ -14,6 +14,12 @@ typedef struct Chat_handle {
     char handle;
 } __attribute__((packed)) Chat_handle;
 
+#define MAX_HANDLE_LENGTH_BYTES 101
+#define MAX_TEXT_LENGTH_BYTES 200
+#define MAX_DEST_HANDLES 9
+
+#define CHAT_SOCKET_CLOSED 0
+
 // Flag = 1 : Client connection
 // |header|source handle|
 #define FLAG_HANDLE_REQ 1
@@ -33,16 +39,17 @@ void send_handle_inuse(int sock);
 // |header|source handle|text|
 #define FLAG_BROADCAST 4
 void send_broadcast(int sock, char* handle, char* text);
+void read_broadcast(int sock, char* handle, char* text);
 
 // Flag = 5 : Message
 // |header|source handle|dest handles...|text|
 #define FLAG_MSG 5
-void send_msg(int sock, int, char** handles, char* text);
+void send_msg(int sock, char*, int, char** handles, char* text);
 
 // Flag = 7 : Handle name error
 // |header|incorrect dest handle|
 #define FLAG_HANDLE_ERR 7
-void send_handle_err(int sock, char* handle);
+void send_dest_handle_err(int sock, char* handle);
 
 // Flag = 8 : Client Exit Request
 // |header|
@@ -76,6 +83,10 @@ void send_hlist_end(int sock);
 
 void read_chat_handle(int socket, char* hbuf);
 int read_chat_header(int socket, int* pdu_length);
+void read_chat_text(int, char*);
+uint8_t read_chat_length(int);
+int read_hlist_num(int);
+
 void trash_packet(int socket, int length);
 
 #endif

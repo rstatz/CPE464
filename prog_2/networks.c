@@ -62,7 +62,7 @@ int tcpServerSetup(int portNumber)
 		exit(-1);
 	}
 	
-	printf("Server Port Number %d \n", ntohs(server.sin6_port));
+	printf("Server is using port %d\n", ntohs(server.sin6_port));
 	
 	return server_socket;
 }
@@ -116,8 +116,9 @@ int tcpClientSetup(char * serverName, char * port)
 		exit(-1);
 	}
 
-	printf("server ip address: %s\n", getIPAddressString(ipAddress));
-	if(connect(socket_num, (struct sockaddr*)&server, sizeof(server)) < 0)
+	DEBUG_PRINT("server ip address: %s\n", getIPAddressString(ipAddress));
+	
+    if(connect(socket_num, (struct sockaddr*)&server, sizeof(server)) < 0)
 	{
 		perror("connect call");
 		exit(-1);

@@ -1,5 +1,5 @@
 prog_1/*.acc
 prog_1/trace
 prog_2/server
-prog_2/client
+prog_2/cclient
 *.o
