@@ -165,7 +165,6 @@ uint8_t cli_parse_msg_text(char* cmd, char* text_buf, char** tlist) {
     uint8_t numt = 0;
 
     do {
-        printf("TEXT BLOCK\n");
         text = text_buf + ((TEXT_BLOCK_SIZE) * numt);
         cmdptr = cmd + ((TEXT_BLOCK_SIZE - 1) * numt);
 
@@ -205,7 +204,18 @@ void cli_parse_msg(char* cmd, int sock, char* my_handle) {
 }
 
 void cli_parse_broadcast(char* cmd, int sock, char* my_handle) {
-    send_broadcast(sock, my_handle, cmd);
+    char text_buf[MAX_CMD_LENGTH_BYTES];
+    char* tlist[MAX_NUM_TEXT_BLOCKS];
+    char* text;
+    int i, numt;
+
+    numt = cli_parse_msg_text(cmd, text_buf, tlist);
+
+    for (i = 0; i < numt; i++) {
+        text = text_buf + (TEXT_BLOCK_SIZE * i);
+
+        send_broadcast(sock, my_handle, text);
+    }
 }
 
 // returns -1 if command exceeds max length
