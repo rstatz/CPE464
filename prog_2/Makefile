@@ -8,11 +8,11 @@ LIBS =
 
 all:   cclient server
 
-cclient: client.c networks.o gethostbyname6.o
-	$(CC) $(CFLAGS) -o cclient client.c chat_packets.c networks.o gethostbyname6.o $(LIBS)
+cclient: client.c chat_client_cli.o chat_packets.o networks.o gethostbyname6.o
+	$(CC) $(CFLAGS) -o cclient client.c chat_client_cli.o chat_packets.o networks.o gethostbyname6.o $(LIBS)
 
-server: server.c networks.o gethostbyname6.o
-	$(CC) $(CFLAGS) -o server server.c client_table.c chat_packets.c linkedlist.c networks.o gethostbyname6.o $(LIBS)
+server: server.c client_table.o chat_packets.o networks.o linkedlist.o gethostbyname6.o
+	$(CC) $(CFLAGS) -o server server.c client_table.o chat_packets.o linkedlist.o networks.o gethostbyname6.o $(LIBS)
 
 .c.o:
 	gcc -c $(CFLAGS) $< -o $@ $(LIBS)
