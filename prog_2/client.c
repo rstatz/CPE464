@@ -240,11 +240,11 @@ void start_chat_client(int sock, char* my_handle) {
 
 int connect_server(char* unix_server, char* port) {
     int sock;
-    char server[100];
+    //char server[100];
 
-    sprintf(server, "%s.csc.calpoly.edu", unix_server);
+    //sprintf(server, "%s.csc.calpoly.edu", unix_server);
     
-    sock = tcpClientSetup(server, port);
+    sock = tcpClientSetup(unix_server, port);
 
     return sock;
 }
