@@ -18,19 +18,18 @@
 
 #define BACKLOG 10
 
+typedef struct udp_info {
+    // udp stuff to pass in below
+} upd_info;
+
 //Safe sending and receiving 
-int safeRecv(int socketNum, void * buf, int len, int flags);
-int safeSend(int socketNum, void * buf, int len, int flags);
 int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, int * addrLen);
 int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, int addrLen);
 
 // for the server side
-int tcpServerSetup(int portNumber);
-int tcpAccept(int server_socket, int debugFlag);
 int udpServerSetup(int portNumber);
 
 // for the client side
-int tcpClientSetup(char * serverName, char * port, int debugFlag);
 int setupUdpClientToServer(struct sockaddr_in6 *server, char * hostName, int portNumber);
 
 

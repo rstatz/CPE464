@@ -4,16 +4,18 @@
 CC = gcc
 CFLAGS= -g -Wall
 
-SRC = networks.c  networks.h gethostbyname.c gethostbyname.h
-OBJS = networks.o gethostbyname.o 
+SRC = rcopy_packets.c window.c networks.c gethostbyname.c
+SERVER_SRC = server.c
+RCOPY_SRC = rcopy.c
+OBJS = $(SRC:.c=.o) 
 
-all:  udpClient udpServer
+all:  rcopy server
 
-udpClient: udpClient.c $(OBJS)
-	$(CC) $(CFLAGS) -o udpClient udpClient.c $(OBJS)
+rcopy: rcopy.c $(OBJS)
+	$(CC) $(CFLAGS) -o client $(RCOPY_SRC) $(OBJS)
 
-udpServer$(FILE): udpServer.c $(OBJS)
-	$(CC) $(CFLAGS) -o udpServer udpServer.c  $(OBJS)
+server: server.c $(OBJS)
+	$(CC) $(CFLAGS) -o server $(SERVER_SRC)  $(OBJS)
 
 	
 .c.o: $SRC
