@@ -56,26 +56,30 @@ int buf_packet(Window* w, uint32_t seq, void* pack, int psize) {
     if (IN_SEQ_RANGE(w, seq, HIGHEST_WNDW_SEQ(w))) { // within the window's sequence range
         seqi = SEQ_INDEX(w, seq);
         p = GET_ENTRY_PTR(w, seqi);
+        //printf("p=%p\n", p);
+
+        if (p->seq != 0) // packet exists
+            return PACKET_EXISTS;
 
         if (!IN_SEQ_RANGE(w, seq, w->cseq)) { // move current if not within current window
-            if (p->seq != 0) // packet exists
-                return PACKET_EXISTS;
-
             w->cseq = seq + 1;
             w->curr = p;
             MOVE_CURR(w);
         }
 
+        p->seq = seq;
         memcpy((void*)p->pack, pack, psize);
     }
     else { // sequence is not within the window's sequence range
         return -1;
     }
+
+    return 0;
 }
 
 // gets packet with a given sequence number
 // returns NULL if packet does not exist
-void* get_packet(Window* w, int seq) {
+void* get_packet(Window* w, uint32_t seq) {
     int seqi;
     Bufpacket* p;
 

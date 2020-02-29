@@ -2,7 +2,12 @@
 #include <errno.h>
 #include <stdlib.h>
 
+#include "debug.h"
 #include "networks.h"
+
+#ifdef DEBUG
+#include "test_rcopy.h"
+#endif
 
 enum STATE {SETUP=0, FILENAME, DATA_RX, TERMINATE};
 
@@ -12,7 +17,7 @@ static void usage() {
 }
 
 static void get_args(int argc, char* argv[], float* err, int* port) {
-    if (argc > 3)
+    if (argc > 3 || argc < 2)
         usage();
     
     *err = strtof(argv[1], NULL);
@@ -36,9 +41,11 @@ int main(int argc, char* argv[]) {
 
     get_args(argc, argv, &err, &port);
 
-	sock = udpServerSetup(port);
+    test_window(); 
 
-    handle_clients(sock, err);
+//	sock = udpServerSetup(port);
+
+//    handle_clients(sock, err);
 
     exit(EXIT_SUCCESS);
 }
