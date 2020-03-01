@@ -18,9 +18,13 @@
 
 #define BACKLOG 10
 
-typedef struct udp_info {
-    // udp stuff to pass in below
-} upd_info;
+typedef struct UDPInfo {
+    int sock;
+    float err;
+
+    struct sockaddr_in6 addr;
+    uint32_t addr_len;
+} UDPInfo;
 
 //Safe sending and receiving 
 int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, int * addrLen);

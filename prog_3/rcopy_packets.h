@@ -10,55 +10,72 @@ typedef struct RC_PHeader {
 } RC_PHeader;
 
 #define MAX_PACK 1400
+#define CRC_ERROR -2
+
+#define UDP_RECV_FLAGS 0
+#define UDP_SEND_FLAGS 0
+
+int send_rc_pack(void* buf, int len, int sock, UDPInfo*);
+int recv_rc_pack(void* buf, int len, int sock, UDPInfo*);
 
 // Flag = 1 : Setup packet (rcopy to server)
 // | header |
 #define FLAG_SETUP 1
-void send_setup(int sock);
+int build_setup_pack(void*);
 
 // Flag = 2 : Setup response packet (server to rcopy)
 // | header |
-#define FLAG_SETUP_RESP 2
-void send_setup_resp(int sock);
+#define FLAG_SETUP_ACK 2
+int build_setup_ack_pack(void*);
 
 // Flag = 3 : Data Packet
 // | header | data |
 #define FLAG_DATA 3
-void send_data(int sock, int seq, int len, void* data); 
+int build_data_pack(void* buf, uint32_t seq, void* data, int len); 
 
 // Flag = 5 : RR
 // | header |
 #define FLAG_RR 5
-void send_rr(int sock, int seq);
+int build_rr_pack(void*, uint32_t seq);
 
 // Flag = 6 : SREJ
 // | header |
 #define FLAG_SREJ 6
-void send_srej(int sock, int seq);
+int build_srej_pack(void*, uint32_t seq);
 
 // Flag = 7 : Setup parameters (rcopy to server)
 // | header | window size | buffer size | filename |
 #define FLAG_SETUP_PARAMS 7
-void send_setup_params(int sock, int wsize, int bsize, char* fname);
+typedef struct RC_Param_Pack {
+    RC_PHeader head;
+    
+    uint16_t wsize; // network order
+    uint16_t bsize; // network order
+
+    // start filename
+} RC_Param_Pack;
+
+int build_setup_params_pack(void*, uint16_t wsize, uint16_t bsize, char* fname);
+void parse_setup_params(void*, uint16_t*, uint16_t*, char*);
 
 // Flag 8 : Setup parameter response (server to rcopy)
 // | header |
-#define FLAG_SETUP_PARAMS_RESP 8
-void send_setup_params_resp(int sock);
+#define FLAG_SETUP_PARAMS_ACK 8
+int build_setup_params_ack_pack(void*);
 
 // Flag 9 : EOF (server to rcopy)
 // | header |
 #define FLAG_EOF 9
-void send_eof(int sock);
+int build_eof_pack(void*, uint32_t seq);
 
 // Flag 10 : EOF_ACK (rcopy to server)
 // | header |
 #define FLAG_EOF_ACK 10
-void send_eof_ack(int sock);
+int build_eof_ack_pack(void*);
 
 // Flag 11 : Bad filename
 // | header |
-#define FLAG_BAD_FILENAME 11
-void send_bad_fname(int sock);
+#define FLAG_BAD_FNAME 11
+int build_bad_fname_pack(void*);
 
 #endif

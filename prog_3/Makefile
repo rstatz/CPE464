@@ -4,7 +4,7 @@
 CC = gcc
 CFLAGS= -g -Wall
 
-SRC = test_rcopy.c rcopy_packets.c window.c networks.c gethostbyname.c
+SRC = test_rcopy.c rcopy_packets.c window.c networks.c gethostbyname.c checksum.c
 SERVER_SRC = server.c
 RCOPY_SRC = rcopy.c
 OBJS = $(SRC:.c=.o) 
