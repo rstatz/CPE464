@@ -53,7 +53,7 @@ int build_setup_params_pack(void* buf, uint16_t wsize, uint16_t bsize, char* fna
 
     strcpy((char*)(pack + 1), fname);
 
-    return sizeof(RC_Param_Pack) + strlen(fname);
+    return sizeof(RC_Param_Pack) + strlen(fname) + 1;
 }
 
 int build_setup_params_ack_pack(void* buf) {

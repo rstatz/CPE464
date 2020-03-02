@@ -52,7 +52,7 @@ typedef struct RC_Param_Pack {
     uint16_t wsize; // network order
     uint16_t bsize; // network order
 
-    // start filename
+    // start filename (null terminated)
 } RC_Param_Pack;
 
 int build_setup_params_pack(void*, uint16_t wsize, uint16_t bsize, char* fname);

@@ -19,7 +19,18 @@
 #include "networks.h"
 #include "gethostbyname.h"
 
-int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, int * addrLen)
+int get_UDP_socket() {
+    int sock;
+    
+    if ((sock = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+        perror("get_UDP_socket: ");
+        exit(EXIT_FAILURE);
+    }
+    
+    return sock;
+}
+
+int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, uint32_t * addrLen)
 {
 	int returnValue = 0;
 	if ((returnValue = recvfrom(socketNum, buf, (size_t) len, flags, srcAddr, (socklen_t *) addrLen)) < 0)
@@ -31,7 +42,7 @@ int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr 
 	return returnValue;
 }
 
-int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, int addrLen)
+int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, uint32_t addrLen)
 {
 	int returnValue = 0;
 	if ((returnValue = sendto(socketNum, buf, (size_t) len, flags, srcAddr, (socklen_t) addrLen)) < 0)
@@ -50,11 +61,7 @@ int udpServerSetup(int portNumber)
 	int serverAddrLen = 0;	
 	
 	// create the socket
-	if ((socketNum = socket(AF_INET6,SOCK_DGRAM,0)) < 0)
-	{
-		perror("socket() call error");
-		exit(-1);
-	}
+	socketNum = get_UDP_socket();
 	
 	// set up the socket
 	server.sin6_family = AF_INET6;    		// internet (IPv6 or IPv4) family
@@ -85,11 +92,7 @@ int setupUdpClientToServer(struct sockaddr_in6 *server, char * hostName, int por
 	uint8_t * ipAddress = NULL;
 	
 	// create the socket
-	if ((socketNum = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-	{
-		perror("socket() call error");
-		exit(-1);
-	}
+	socketNum = get_UDP_socket();
   	 	
 	if ((ipAddress = gethostbyname6(hostName, server)) == NULL)
 	{

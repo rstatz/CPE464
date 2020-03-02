@@ -43,29 +43,15 @@ static void get_args(int argc, char* argv[], float* err, int* port) {
     *port = (argc == 3) ? atoi(argv[2]) : 0;
 }
 
-static void start_server(int server_sock) {
-    fd_set rfds;
-    int active_fds;
- 
-    FD_ZERO(&rfds);
-    FD_SET(server_sock, &rfds);    
+STATE FSM_setup_client(int* sock, UDPInfo* udp) {
+    // TODO fork
 
-//    while(1) {
-        DEBUG_PRINT("SELECT\n");
-        active_fds = select(server_sock + 1, &rfds, NULL, NULL, NULL);
-        DEBUG_PRINT("WOKE\n");
-        
-        // check CRC and do not process if bad
+    // close server socket?
 
-            // fork and handle new client
-            // break on accepting new client and execute FSM
-//    }
-}
+    // get new client socket
+    *sock = get_UDP_socket();
 
-STATE FSM_setup_client(int sock, UDPInfo* udp) {
-    // receive setup packet
-    // if valid, state = setup_ack
-    // else terminate
+    return SETUP_ACK;
 }
 
 STATE FSM_setup_ack(int sock, float err, void* pack, UDPInfo* udp) {    
@@ -80,21 +66,23 @@ STATE FSM_setup_ack(int sock, float err, void* pack, UDPInfo* udp) {
         // bad crc then resend
         // bad flag then ?
         // good then state = FILENAME
+    return FILENAME;
 }
 
-static void handle_client(int sock, float err) {
+static void handle_client(float err, UDPInfo* udp) {
+    int client_sock;
     uint8_t pack[MAX_PACK]; // allows passing packets between states
-    UDPInfo udp;
     STATE state = SETUP_ACK;
     bool run = true;
 
     while(run) {
         switch(state) {
             case(SETUP) :
-                state = FSM_setup_client(sock, &udp);
+                state = FSM_setup_client(&client_sock, udp);
                 break;
             case(SETUP_ACK) :
-                state = FSM_setup_ack(sock, err, (void*)pack, &udp);
+                state = FSM_setup_ack(client_sock, err, (void*)pack, udp);
+                state = TERMINATE; // TODO temp for testing
                 break;
             case(FILENAME) :
                 break;
@@ -104,9 +92,46 @@ static void handle_client(int sock, float err) {
                 break;
             case(DATA_RECOV) :
                 break;
+            case(SEND_EOF) :
+                break;
             case(TERMINATE) :
-                // TODO cleanup
+                close(client_sock);
+                // TODO other cleanup?
                 run = false;
+                break;
+            default:
+                DEBUG_PRINT("Server FSM: bad state\n");
+                state = TERMINATE;
+                break;
+        }
+    }
+}
+
+static void start_server(int server_sock, UDPInfo* udp) {
+    fd_set rfds;
+    int flag;
+    
+    uint8_t pack[MAX_PACK];
+ 
+    FD_ZERO(&rfds);
+    FD_SET(server_sock, &rfds);    
+
+    while(1) {
+        DEBUG_PRINT("SELECT\n");
+        select(server_sock + 1, &rfds, NULL, NULL, NULL);
+        DEBUG_PRINT("WOKE\n");
+        
+        flag = recv_rc_pack((void*)pack, MAX_PACK, server_sock, udp);
+        
+        switch(flag) {
+            case(FLAG_SETUP):
+                DEBUG_PRINT("start_server: valid connection request\n");
+                return;
+            case(CRC_ERROR):
+                DEBUG_PRINT("start_server: CRC_ERROR\n");
+                break;
+            default:
+                DEBUG_PRINT("start_server: bad packet received\n");
                 break;
         }
     }
@@ -114,17 +139,18 @@ static void handle_client(int sock, float err) {
 
 int main(int argc, char* argv[]) {
     float err;
-    int port, sock;
+    int port, server_sock;
+    UDPInfo udp;
 
     get_args(argc, argv, &err, &port);
 
 //    test_window(); 
 
-	sock = udpServerSetup(port);
+	server_sock = udpServerSetup(port);
 
-    start_server(sock);
+    start_server(server_sock, &udp);
 
-    handle_client(sock, err);
+    handle_client(err, &udp);
 
     exit(EXIT_SUCCESS);
 }
