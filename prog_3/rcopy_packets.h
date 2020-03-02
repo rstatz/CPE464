@@ -10,6 +10,10 @@ typedef struct RC_PHeader {
 } RC_PHeader;
 
 #define MAX_PACK 1400
+#define MAX_FNAME 200
+//#define MAX_WSIZE 
+//#define MAX_BSIZE 
+
 #define CRC_ERROR -2
 
 #define UDP_RECV_FLAGS 0

@@ -22,7 +22,7 @@ typedef struct UDPInfo {
     int sock;
     float err;
 
-    struct sockaddr addr;
+    struct sockaddr_in6 addr;
     uint32_t addr_len;
 } UDPInfo;
 
@@ -30,8 +30,8 @@ typedef struct UDPInfo {
 int get_UDP_socket();
 
 //Safe sending and receiving 
-int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, uint32_t * addrLen);
-int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, uint32_t addrLen);
+int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr_in6 *srcAddr, uint32_t * addrLen);
+int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr_in6 *srcAddr, uint32_t addrLen);
 
 // for the server side
 int udpServerSetup(int portNumber);

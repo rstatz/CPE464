@@ -30,10 +30,10 @@ int get_UDP_socket() {
     return sock;
 }
 
-int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, uint32_t * addrLen)
+int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr_in6 *srcAddr, uint32_t * addrLen)
 {
 	int returnValue = 0;
-	if ((returnValue = recvfrom(socketNum, buf, (size_t) len, flags, srcAddr, (socklen_t *) addrLen)) < 0)
+	if ((returnValue = recvfrom(socketNum, buf, (size_t) len, flags, (struct sockaddr*)srcAddr, (socklen_t *) addrLen)) < 0)
 	{
 		perror("recvfrom: ");
 		exit(-1);
@@ -42,10 +42,10 @@ int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr 
 	return returnValue;
 }
 
-int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr *srcAddr, uint32_t addrLen)
+int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr_in6 *srcAddr, uint32_t addrLen)
 {
 	int returnValue = 0;
-	if ((returnValue = sendto(socketNum, buf, (size_t) len, flags, srcAddr, (socklen_t) addrLen)) < 0)
+	if ((returnValue = sendto(socketNum, buf, (size_t) len, flags, (struct sockaddr*)srcAddr, (socklen_t) addrLen)) < 0)
 	{
 		perror("sendto: ");
 		exit(-1);

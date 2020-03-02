@@ -12,7 +12,7 @@ OBJS = $(SRC:.c=.o)
 all:  rcopy server
 
 rcopy: rcopy.c $(OBJS)
-	$(CC) $(CFLAGS) -o client $(RCOPY_SRC) $(OBJS)
+	$(CC) $(CFLAGS) -o rcopy $(RCOPY_SRC) $(OBJS)
 
 server: server.c $(OBJS)
 	$(CC) $(CFLAGS) -o server $(SERVER_SRC)  $(OBJS)
