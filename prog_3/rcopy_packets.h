@@ -9,6 +9,8 @@ typedef struct RC_PHeader {
     uint8_t flag;
 } RC_PHeader;
 
+#define MAX_ATTEMPTS 10
+
 #define MAX_PACK 1400
 #define MAX_FNAME 200
 //#define MAX_WSIZE 

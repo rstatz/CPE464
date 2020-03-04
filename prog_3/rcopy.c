@@ -75,8 +75,15 @@ void get_args(int argc, char* argv[], client_args* ca) {
 }
 
 static STATE FSM_setup(client_args* ca, UDPInfo* udp, int* sock) {
+    uint8_t timeout = MAX_ATTEMPTS;
+
     // setup client socket
     *sock = setupUdpClientToServer(&udp->addr, ca->rname, ca->port);
+
+    do {
+        // send packet
+        // select with timeout
+    } while (--timeout > 0);
 
     return FILENAME;
 }
