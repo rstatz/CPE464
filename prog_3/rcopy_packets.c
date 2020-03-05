@@ -137,18 +137,18 @@ int send_rc_setup_params_pack(void* buf, int sock, UDPInfo* udp) {
 // only returns data from a single datagram no matter buffer length
 // returns flag of packet, CRC_ERROR if error, -1 if other error
 int recv_rc_pack(void* buf, int len, int sock, UDPInfo* udp) {
+    int recv_len;
     uint16_t ck_sum;    
 
-    len = (len < MAX_PACK) ? len : MAX_PACK;
+    recv_len = (len < MAX_PACK) ? len : MAX_PACK;
+    recv_len = safeRecvfrom(sock, buf, recv_len, udp);
 
-    len = safeRecvfrom(sock, buf, MAX_PACK, udp);
-
-    if (len < sizeof(RC_PHeader))
+    if (recv_len < sizeof(RC_PHeader))
         return -1;
 
-    ck_sum = in_cksum((unsigned short*)buf, len);
+    ck_sum = in_cksum((unsigned short*)buf, recv_len);
 
-//    DEBUG_PRINT("RECV_LEN = %d\n", len);
+//    DEBUG_PRINT("RECV_LEN = %d\n", recv_len);
 //    DEBUG_PRINT("CHECKSUM = %d\n", ck_sum);
 
     if (ck_sum != VALID_CHECKSUM)

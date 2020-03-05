@@ -22,11 +22,8 @@
 #define USE_TIMEOUT false
 
 typedef struct UDPInfo {
-    int sock;
-    float err;
-
     struct sockaddr_in6 addr;
-    uint32_t addr_len;
+    socklen_t addr_len;
 } UDPInfo;
 
 // sets up UDP socket

@@ -69,8 +69,6 @@ STATE FSM_setup_ack(int sock, void* pack, UDPInfo* udp) {
 
     build_setup_ack_pack((void*)setup_ack_pack); 
 
-    printf("iplen = %d\n", udp->addr_len);
-
     while(!done) {
         done = true; // assume success
 
@@ -197,11 +195,13 @@ static bool handle_client(UDPInfo* udp) {
 }
 
 static void start_server(int port) {
-    UDPInfo udp;
-    int flag;
+    int flag, server_sock;
     uint8_t pack[MAX_PACK];
+    UDPInfo udp = {0};
+ 
+    DEBUG_PRINT("Starting Server\n");
 
- 	int server_sock = udpServerSetup(port);
+ 	server_sock = udpServerSetup(port);
 
     while(1) {
         select_call(server_sock, 0, 0, !USE_TIMEOUT);
@@ -209,6 +209,7 @@ static void start_server(int port) {
         flag = recv_rc_pack((void*)pack, MAX_PACK, server_sock, &udp);
     
         DEBUG_PRINT("CONNECTED IP=%s\n", ipAddressToString(&udp.addr));
+        DEBUG_PRINT("iplen = %d\n", udp.addr_len);
       
         switch(flag) {
             case(FLAG_SETUP):
