@@ -23,6 +23,8 @@ typedef struct client_args {
     uint16_t wsize, bsize;
     int port;
     float err;
+
+    FILE* write_fd;
 } client_args;
 
 void usage() {
@@ -78,6 +80,14 @@ void get_args(int argc, char* argv[], client_args* ca) {
 static STATE FSM_setup(client_args* ca, int* sock, UDPInfo* udp) {
     uint8_t setup_pack[sizeof(RC_PHeader)];
     uint8_t setup_ack_pack[sizeof(RC_PHeader)];
+    uint8_t tries = MAX_ATTEMPTS;
+    bool done = false;
+
+    // check write file
+    if ((ca->write_fd = fopen(ca->to_fname, "w")) < 0) {
+        fprintf(stderr, "rcopy: Invalid output filepath\n");
+        return TERMINATE;
+    }
 
     // setup client socket
     *sock = setupUdpClientToServer(udp, ca->rname, ca->port);   
@@ -85,42 +95,63 @@ static STATE FSM_setup(client_args* ca, int* sock, UDPInfo* udp) {
     // setup packet
     build_setup_pack((void*)setup_pack);
 
-    if (select_resend_n(*sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, MAX_ATTEMPTS, udp) == TIMEOUT_REACHED) {
-        return TERMINATE;
+    while(!done) {
+        done = true; // assume success
+
+        if ((tries = select_resend_n(*sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, tries, udp)) == TIMEOUT_REACHED)
+            return TERMINATE;
+
+        // check recv flag
+        switch(recv_rc_pack((void*)&setup_ack_pack, MAX_PACK, *sock, udp)) {
+            case(FLAG_SETUP_ACK) :
+                return SETUP_PARAMS;
+            case(CRC_ERROR) :
+                DEBUG_PRINT("rcopy: CRC Error SETUP\n");
+            default:
+                DEBUG_PRINT("rcopy: expected setup ack, received unknown packet\n");
+                done = (tries == 0);
+                break;
+        }
     }
 
-    // check recv flag
-    switch(recv_rc_pack((void*)&setup_ack_pack, MAX_PACK, *sock, udp)) {
-        case(FLAG_SETUP_ACK) :
-            return SETUP_PARAMS;
-        default:
-            DEBUG_PRINT("rcopy: expected setup ack, received unknown packet\n");
-            return TERMINATE;
-    }
+    return TERMINATE;
 }
 
 static STATE FSM_setup_params(client_args* ca, int sock, UDPInfo* udp) {
     uint8_t sp_pack[MAX_PACK];
-    uint8_t sp_ack_pack[sizeof(RC_PHeader)];  
-
+    uint8_t sp_ack_pack[MAX_PACK];
+    uint8_t tries = MAX_ATTEMPTS;
+    bool done = false;
+    
     build_setup_params_pack((void*)&sp_pack, ca->wsize, ca->bsize, ca->from_fname);
+    
+    while (!done) {
+        done = true; //assume success
 
-    if (select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, MAX_ATTEMPTS, udp) == TIMEOUT_REACHED) {
-        return TERMINATE;
+        if ((tries = select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, tries, udp)) == TIMEOUT_REACHED)
+            return TERMINATE;
+
+        switch(recv_rc_pack((void*)&sp_ack_pack, MAX_PACK, sock, udp)) {
+            case(FLAG_SETUP_PARAMS_ACK) :
+                DEBUG_PRINT("rcopy: to filename accepted\n");
+                return DATA_RX;
+            case(FLAG_BAD_FNAME) :
+                fprintf(stderr, "rcopy: Invalid input filepath\n");
+                return TERMINATE;
+            case(CRC_ERROR) :
+                DEBUG_PRINT("rcopy: CRC Error SETUP_PARAMS\n");
+            default:
+                DEBUG_PRINT("rcopy: expected setup param response, received bad packet\n");
+                done = (tries == 0);
+                break;
+        }
     }
 
-    // check recv flag
-    switch(recv_rc_pack((void*)&sp_ack_pack, MAX_PACK, sock, udp)) {
-        case(FLAG_SETUP_PARAMS_ACK) :
-            DEBUG_PRINT("rcopy: filenames accepted\n");
-            return DATA_RX;
-        case(FLAG_BAD_FNAME) :
-            fprintf(stderr, "rcopy: bad filename\n");
-            return TERMINATE;
-        default:
-            DEBUG_PRINT("rcopy: expected setup param response, received unknown packet\n");
-            return TERMINATE;
-    }
+    return TERMINATE;
+}
+
+static STATE FSM_data_rx(client_args* ca, int sock, UDPInfo* udp) {
+    return TERMINATE;
 }
 
 static void start_rcopy(client_args* ca) {
@@ -132,15 +163,19 @@ static void start_rcopy(client_args* ca) {
     while(run) {
         switch(state) {
             case(SETUP) :
+                DEBUG_PRINT("rcopy: sending connection request\n");
                 state = FSM_setup(ca, &client_sock, &udp);
                 break;
             case(SETUP_PARAMS) :
+                DEBUG_PRINT("rcopy: sending setup params\n");
                 state = FSM_setup_params(ca, client_sock, &udp);
-                state = TERMINATE; // TODO for testing
                 break;
             case(DATA_RX) :
+                DEBUG_PRINT("rcopy: starting data Rx\n");
+                state = FSM_data_rx(ca, client_sock, &udp);
                 break;
             case(TERMINATE) :
+                fclose(ca->write_fd);
                 close(client_sock);
                 run = false;
                 break;
@@ -153,7 +188,7 @@ static void start_rcopy(client_args* ca) {
 }
 
 int main(int argc, char* argv[]) {
-    client_args ca;
+    client_args ca = {0};
 
     #ifdef DEBUG
         setvbuf(stdout, NULL, _IONBF, 0);

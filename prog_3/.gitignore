@@ -2,3 +2,4 @@ server
 rcopy
 *.o
 smith/*
+libcpe464/*

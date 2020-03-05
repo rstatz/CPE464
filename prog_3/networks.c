@@ -59,7 +59,7 @@ int safeSendtoErr(int socketNum, void* buf, int len, UDPInfo* udp)
 
 int udpServerSetup(int portNumber)
 {
-	struct sockaddr_in6 server;
+	struct sockaddr_in6 server = {0};
 	int socketNum = 0;
 	int serverAddrLen = 0;	
 	

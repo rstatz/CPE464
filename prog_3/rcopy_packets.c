@@ -110,13 +110,14 @@ int build_bad_fname_pack(void* buf) {
 // returns length of sent packet
 int send_rc_pack(void* buf, int len, int sock, UDPInfo* udp) {
     // calculate crc
-    ((RC_PHeader*)buf)->crc = -1 * in_cksum((unsigned short*)buf, len);
+    ((RC_PHeader*)buf)->crc = 0;
+    ((RC_PHeader*)buf)->crc = in_cksum((unsigned short*)buf, len);
 
     // send packet and return length
     return safeSendtoErr(sock, buf, len, udp);
 }
 
-int send_rc_last(int sock, UDPInfo* udp) {
+int send_last_rc_build(int sock, UDPInfo* udp) {
     return send_rc_pack(g_last_pack, g_len, sock, udp);
 }
 
@@ -136,6 +137,8 @@ int send_rc_setup_params_pack(void* buf, int sock, UDPInfo* udp) {
 // only returns data from a single datagram no matter buffer length
 // returns flag of packet, CRC_ERROR if error, -1 if other error
 int recv_rc_pack(void* buf, int len, int sock, UDPInfo* udp) {
+    uint16_t ck_sum;    
+
     len = (len < MAX_PACK) ? len : MAX_PACK;
 
     len = safeRecvfrom(sock, buf, MAX_PACK, udp);
@@ -143,36 +146,41 @@ int recv_rc_pack(void* buf, int len, int sock, UDPInfo* udp) {
     if (len < sizeof(RC_PHeader))
         return -1;
 
-    if (in_cksum((unsigned short*)buf, len) != VALID_CHECKSUM)
+    ck_sum = in_cksum((unsigned short*)buf, len);
+
+//    DEBUG_PRINT("RECV_LEN = %d\n", len);
+//    DEBUG_PRINT("CHECKSUM = %d\n", ck_sum);
+
+    if (ck_sum != VALID_CHECKSUM)
         return CRC_ERROR;
 
     return ((RC_PHeader*)buf)->flag;
 }
 
-void parse_setup_params(void* buf, uint16_t* wsize, uint16_t* bsize, char* fname) {
+void parse_setup_params(void* buf, uint16_t* wsize, uint16_t* bsize, char** fname) {
     RC_Param_Pack* pack = (RC_Param_Pack*)buf;
 
     *wsize = ntohs(pack->wsize);
     *bsize = ntohs(pack->bsize);
 
-    strcpy(fname, (char*)(pack + 1));
+    *fname = (char*)(pack + 1);
 }
 
 // returns select times out n times, false otherwise
-bool select_resend_n(int sock, int32_t seconds, int microseconds, bool set_null, int num_tries, UDPInfo* udp) {
+int select_resend_n(int sock, int32_t seconds, int microseconds, bool set_null, int num_tries, UDPInfo* udp) {
     bool timed_out = false;
 
     do {
-        send_rc_last(sock, udp);
+        send_last_rc_build(sock, udp);
         
         timed_out = select_call(sock, seconds, microseconds, set_null); 
-    } while (timed_out && --num_tries > 0);
+    } while (--num_tries > 0 && timed_out);
 
     // terminate if max attempts reached
     if (timed_out == true) {
         DEBUG_PRINT("rcopy: select timeout reached\n");
-        return true;
+        return 0;
     }
 
-    return false;
+    return num_tries;
 }

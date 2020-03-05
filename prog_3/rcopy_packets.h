@@ -19,12 +19,13 @@ typedef struct RC_PHeader {
 #define CRC_ERROR -2
 
 #define TIMEOUT_VALUE_S 1
-#define TIMEOUT_REACHED true
-
-bool select_resend_n(int sock, int seconds, int microseconds, bool set_null, int num_tries, UDPInfo*);
+#define TIMEOUT_REACHED 0
 
 int send_rc_pack(void* buf, int len, int sock, UDPInfo*);
 int recv_rc_pack(void* buf, int len, int sock, UDPInfo*);
+
+int send_last_rc_build(int sock, UDPInfo* udp);
+int select_resend_n(int sock, int seconds, int microseconds, bool set_null, int num_tries, UDPInfo*);
 
 // Flag = 1 : Setup packet (rcopy to server)
 // | header |
@@ -66,7 +67,7 @@ typedef struct RC_Param_Pack {
 
 int build_setup_params_pack(void*, uint16_t wsize, uint16_t bsize, char* fname);
 //int send_rc_setup_params_pack(void*, int sock, UDPInfo* udp);
-void parse_setup_params(void*, uint16_t*, uint16_t*, char*);
+void parse_setup_params(void*, uint16_t*, uint16_t*, char**);
 
 // Flag 8 : Setup parameter response (server to rcopy)
 // | header |
