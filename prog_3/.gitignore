@@ -3,3 +3,4 @@ rcopy
 *.o
 smith/*
 libcpe464/*
+*.test

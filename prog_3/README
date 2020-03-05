@@ -1,0 +1,6 @@
+Ryan Statz, 6pm
+------------
+
+Flag 9 = EOF packet
+Flag 10 = EOF ACK packet
+Flag 11 = Bad Filename packet

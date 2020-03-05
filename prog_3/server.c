@@ -8,6 +8,7 @@
 #include "cpe464.h"
 #include "networks.h"
 #include "rcopy_packets.h"
+#include "gethostbyname.h"
 
 #define RESEND_TRIES 10
 
@@ -114,7 +115,7 @@ static STATE FSM_get_params(int sock, void* setup_params_pack, UDPInfo* udp, SPa
         return TERMINATE;
     } 
 
-    DEBUG_PRINT("server: good filename received, sending response");
+    DEBUG_PRINT("server: good filename received, sending response\n");
     build_setup_params_ack_pack((void*)&response_pack);
 
     // send filename_ack
@@ -194,7 +195,7 @@ static bool handle_client(UDPInfo* udp) {
 }
 
 static void start_server(int port) {
-    UDPInfo udp = {0};
+    UDPInfo udp;
     int flag;
     uint8_t pack[MAX_PACK];
 
@@ -204,7 +205,9 @@ static void start_server(int port) {
         select_call(server_sock, 0, 0, !USE_TIMEOUT);
         
         flag = recv_rc_pack((void*)pack, MAX_PACK, server_sock, &udp);
-        
+    
+        DEBUG_PRINT("CONNECTED IP=%s\n", ipAddressToString(&udp.addr));
+      
         switch(flag) {
             case(FLAG_SETUP):
                 DEBUG_PRINT("main_server: valid connection request\n");

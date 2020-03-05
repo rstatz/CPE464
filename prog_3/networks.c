@@ -36,7 +36,7 @@ int get_UDP_socket() {
 int safeRecvfrom(int socketNum, void* buf, int len, UDPInfo* udp)
 {
 	int returnValue = 0;
-	if ((returnValue = recvfrom(socketNum, buf, (size_t) len, 0, (struct sockaddr*)&udp->addr, &udp->addr_len)) < 0)
+	if ((returnValue = recvfrom(socketNum, buf, (size_t) len, 0, (struct sockaddr*)&udp->addr, (socklen_t*)&udp->addr_len)) < 0)
 	{
 		perror("recvfrom: ");
 		exit(-1);
