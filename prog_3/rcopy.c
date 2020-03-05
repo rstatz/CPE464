@@ -156,7 +156,7 @@ static STATE FSM_data_rx(client_args* ca, int sock, UDPInfo* udp) {
 
 static void start_rcopy(client_args* ca) {
     STATE state = SETUP;
-    UDPInfo udp = {0};
+    UDPInfo udp = {{0}};
     int client_sock = 0; 
     bool run = true;
     

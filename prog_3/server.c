@@ -197,7 +197,7 @@ static bool handle_client(UDPInfo* udp) {
 static void start_server(int port) {
     int flag, server_sock;
     uint8_t pack[MAX_PACK];
-    UDPInfo udp = {0};
+    UDPInfo udp = {{0}};
  
     DEBUG_PRINT("Starting Server\n");
 

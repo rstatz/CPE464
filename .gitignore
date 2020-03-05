@@ -4,3 +4,4 @@ prog_2/server
 prog_2/cclient
 *.o
 *.old
+libcpe464/
