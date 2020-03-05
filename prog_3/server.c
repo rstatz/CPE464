@@ -69,6 +69,8 @@ STATE FSM_setup_ack(int sock, void* pack, UDPInfo* udp) {
 
     build_setup_ack_pack((void*)setup_ack_pack); 
 
+    printf("iplen = %d\n", udp->addr_len);
+
     while(!done) {
         done = true; // assume success
 
