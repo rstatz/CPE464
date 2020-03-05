@@ -2,7 +2,7 @@
 # written by Hugh Smith - April 2019
 
 CC= gcc
-CFLAGS= -g -Wall
+CFLAGS= -g -Wall -Werror
 LIBS = 
 
 

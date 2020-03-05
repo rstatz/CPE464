@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -16,6 +17,8 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#include "cpe464.h"
+#include "debug.h"
 #include "networks.h"
 #include "gethostbyname.h"
 
@@ -30,10 +33,10 @@ int get_UDP_socket() {
     return sock;
 }
 
-int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr_in6 *srcAddr, uint32_t * addrLen)
+int safeRecvfrom(int socketNum, void* buf, int len, UDPInfo* udp)
 {
 	int returnValue = 0;
-	if ((returnValue = recvfrom(socketNum, buf, (size_t) len, flags, (struct sockaddr*)srcAddr, (socklen_t *) addrLen)) < 0)
+	if ((returnValue = recvfrom(socketNum, buf, (size_t) len, 0, (struct sockaddr*)&udp->addr, &udp->addr_len)) < 0)
 	{
 		perror("recvfrom: ");
 		exit(-1);
@@ -42,12 +45,12 @@ int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr_
 	return returnValue;
 }
 
-int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr_in6 *srcAddr, uint32_t addrLen)
+int safeSendtoErr(int socketNum, void* buf, int len, UDPInfo* udp)
 {
 	int returnValue = 0;
-	if ((returnValue = sendto(socketNum, buf, (size_t) len, flags, (struct sockaddr*)srcAddr, (socklen_t) addrLen)) < 0)
+	if ((returnValue = sendtoErr(socketNum, (void*)buf, (size_t)len, 0, (struct sockaddr*)&udp->addr, (socklen_t)udp->addr_len)) < 0)
 	{
-		perror("sendto: ");
+		perror("sendto");
 		exit(-1);
 	}
 	
@@ -84,23 +87,26 @@ int udpServerSetup(int portNumber)
 	
 }
 
-int setupUdpClientToServer(struct sockaddr_in6 *server, char * hostName, int portNumber)
+int setupUdpClientToServer(UDPInfo* udp, char * hostName, int portNumber)
 {
 	// currently only setup for IPv4 
 	int socketNum = 0;
 	char ipString[INET6_ADDRSTRLEN];
 	uint8_t * ipAddress = NULL;
 	
+    memset((void*)&udp->addr, 0, sizeof(struct sockaddr_in6));
+    udp->addr_len = sizeof(struct sockaddr_in6);
+
 	// create the socket
 	socketNum = get_UDP_socket();
   	 	
-	if ((ipAddress = gethostbyname6(hostName, server)) == NULL)
+	if ((ipAddress = gethostbyname6(hostName, &udp->addr)) == NULL)
 	{
 		exit(-1);
 	}
 	
-	server->sin6_port = ntohs(portNumber);
-	server->sin6_family = AF_INET6;	
+	udp->addr.sin6_port = ntohs(portNumber);
+	udp->addr.sin6_family = AF_INET6;	
 	
 	inet_ntop(AF_INET6, ipAddress, ipString, sizeof(ipString));
 	printf("Server info - IP: %s Port: %d \n", ipString, portNumber);
@@ -108,4 +114,28 @@ int setupUdpClientToServer(struct sockaddr_in6 *server, char * hostName, int por
 	return socketNum;
 }
 
+bool select_call(int sock, int seconds, int microseconds, bool set_null) {
+    fd_set rfds;
+    struct timeval aTimeout;
+    struct timeval *timeout = NULL;
 
+    if (!set_null) {
+        aTimeout.tv_sec = seconds;
+        aTimeout.tv_usec = microseconds;
+        timeout = &aTimeout;
+    }
+
+    FD_ZERO(&rfds);
+    FD_SET(sock, &rfds);    
+
+    //DEBUG_PRINT("SELECT\n");
+    if(select(sock + 1, &rfds, (fd_set*)0, (fd_set*)0, timeout) < 0) {
+        perror("select");
+        exit(EXIT_FAILURE);
+    }
+    //DEBUG_PRINT("WOKE\n");
+ 
+    if (FD_ISSET(sock, &rfds))
+        return false;
+    return true;
+}

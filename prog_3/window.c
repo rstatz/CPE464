@@ -26,7 +26,7 @@ void clear_buf(Bufpacket* buf, int bufsize) {
 Window* get_window(int wsize) {
     Window * w;
     
-    w = malloc(sizeof(Window));
+    w = (Window*)malloc(sizeof(Window));
 
     w->wsize = wsize;
 

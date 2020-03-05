@@ -6,6 +6,7 @@
 #include <sys/select.h>
 
 #include "debug.h"
+#include "cpe464.h"
 #include "networks.h"
 #include "rcopy_packets.h"
 
@@ -13,7 +14,7 @@
 
 typedef enum STATE {TERMINATE = -1,
                     SETUP = 0,
-                    FILENAME,
+                    SETUP_PARAMS,
                     DATA_RX} STATE;
 
 typedef struct client_args {
@@ -74,32 +75,67 @@ void get_args(int argc, char* argv[], client_args* ca) {
     ca->rname = argv[6];
 }
 
-static STATE FSM_setup(client_args* ca, UDPInfo* udp, int* sock) {
-    uint8_t timeout = MAX_ATTEMPTS;
+static STATE FSM_setup(client_args* ca, int* sock, UDPInfo* udp) {
+    uint8_t setup_pack[sizeof(RC_PHeader)];
+    uint8_t setup_ack_pack[sizeof(RC_PHeader)];
 
     // setup client socket
-    *sock = setupUdpClientToServer(&udp->addr, ca->rname, ca->port);
+    *sock = setupUdpClientToServer(udp, ca->rname, ca->port);   
+    
+    // setup packet
+    build_setup_pack((void*)setup_pack);
 
-    do {
-        // send packet
-        // select with timeout
-    } while (--timeout > 0);
+    if (select_resend_n(*sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, MAX_ATTEMPTS, udp) == TIMEOUT_REACHED) {
+        return TERMINATE;
+    }
 
-    return FILENAME;
+    // check recv flag
+    switch(recv_rc_pack((void*)&setup_ack_pack, MAX_PACK, *sock, udp)) {
+        case(FLAG_SETUP_ACK) :
+            return SETUP_PARAMS;
+        default:
+            DEBUG_PRINT("rcopy: expected setup ack, received unknown packet\n");
+            return TERMINATE;
+    }
+}
+
+static STATE FSM_setup_params(client_args* ca, int sock, UDPInfo* udp) {
+    uint8_t sp_pack[MAX_PACK];
+    uint8_t sp_ack_pack[sizeof(RC_PHeader)];  
+
+    build_setup_params_pack((void*)&sp_pack, ca->wsize, ca->bsize, ca->from_fname);
+
+    if (select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, MAX_ATTEMPTS, udp) == TIMEOUT_REACHED) {
+        return TERMINATE;
+    }
+
+    // check recv flag
+    switch(recv_rc_pack((void*)&sp_ack_pack, MAX_PACK, sock, udp)) {
+        case(FLAG_SETUP_PARAMS_ACK) :
+            DEBUG_PRINT("rcopy: filenames accepted\n");
+            return DATA_RX;
+        case(FLAG_BAD_FNAME) :
+            fprintf(stderr, "rcopy: bad filename\n");
+            return TERMINATE;
+        default:
+            DEBUG_PRINT("rcopy: expected setup param response, received unknown packet\n");
+            return TERMINATE;
+    }
 }
 
 static void start_rcopy(client_args* ca) {
     STATE state = SETUP;
-    UDPInfo udp;
-    int client_sock; 
+    UDPInfo udp = {0};
+    int client_sock = 0; 
     bool run = true;
     
     while(run) {
         switch(state) {
             case(SETUP) :
-                state = FSM_setup(ca, &udp, &client_sock);
+                state = FSM_setup(ca, &client_sock, &udp);
                 break;
-            case(FILENAME) :
+            case(SETUP_PARAMS) :
+                state = FSM_setup_params(ca, client_sock, &udp);
                 state = TERMINATE; // TODO for testing
                 break;
             case(DATA_RX) :
@@ -113,14 +149,19 @@ static void start_rcopy(client_args* ca) {
                 state = TERMINATE;
                 break;
         }
-    }
-    
+    } 
 }
 
 int main(int argc, char* argv[]) {
     client_args ca;
 
+    #ifdef DEBUG
+        setvbuf(stdout, NULL, _IONBF, 0);
+    #endif
+
     get_args(argc, argv, &ca);
+
+    sendErr_init(ca.err, DROP_ON, FLIP_ON, DEBUG_ON, RSEED_ON); // TODO debug off
 
     start_rcopy(&ca);
 

@@ -34,6 +34,18 @@
  * SUCH DAMAGE.
  */
 
+/* NOTE: Data length needs to be an even number of bytes.  When you pass in
+   an odd length packet, this function will go off the end of your data
+   by one byte.  (It works on shorts so think about it...)  So, for odd
+   length packets, make sure the byte following the packet is zeroed out.
+
+   See textbook - Garcia 2nd ed. page 607 for more details
+
+   Hugh Smith
+   
+*/
+
+#include "networks/checksum.h"
 
 #include <stdlib.h>
 #include <stdio.h>

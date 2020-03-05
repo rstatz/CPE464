@@ -7,7 +7,7 @@ typedef struct RC_PHeader {
     uint32_t seq; // network order
     uint32_t crc; // network order
     uint8_t flag;
-} RC_PHeader;
+} __attribute__((packed)) RC_PHeader;
 
 #define MAX_ATTEMPTS 10
 
@@ -18,8 +18,10 @@ typedef struct RC_PHeader {
 
 #define CRC_ERROR -2
 
-#define UDP_RECV_FLAGS 0
-#define UDP_SEND_FLAGS 0
+#define TIMEOUT_VALUE_S 1
+#define TIMEOUT_REACHED true
+
+bool select_resend_n(int sock, int seconds, int microseconds, bool set_null, int num_tries, UDPInfo*);
 
 int send_rc_pack(void* buf, int len, int sock, UDPInfo*);
 int recv_rc_pack(void* buf, int len, int sock, UDPInfo*);
@@ -28,6 +30,7 @@ int recv_rc_pack(void* buf, int len, int sock, UDPInfo*);
 // | header |
 #define FLAG_SETUP 1
 int build_setup_pack(void*);
+//int send_rc_setup_pack(void*, int, UDPInfo*);
 
 // Flag = 2 : Setup response packet (server to rcopy)
 // | header |
@@ -59,9 +62,10 @@ typedef struct RC_Param_Pack {
     uint16_t bsize; // network order
 
     // start filename (null terminated)
-} RC_Param_Pack;
+} __attribute__((packed)) RC_Param_Pack;
 
 int build_setup_params_pack(void*, uint16_t wsize, uint16_t bsize, char* fname);
+//int send_rc_setup_params_pack(void*, int sock, UDPInfo* udp);
 void parse_setup_params(void*, uint16_t*, uint16_t*, char*);
 
 // Flag 8 : Setup parameter response (server to rcopy)

@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
@@ -17,6 +18,8 @@
 #include <netdb.h>
 
 #define BACKLOG 10
+
+#define USE_TIMEOUT false
 
 typedef struct UDPInfo {
     int sock;
@@ -30,14 +33,16 @@ typedef struct UDPInfo {
 int get_UDP_socket();
 
 //Safe sending and receiving 
-int safeRecvfrom(int socketNum, void * buf, int len, int flags, struct sockaddr_in6 *srcAddr, uint32_t * addrLen);
-int safeSendto(int socketNum, void * buf, int len, int flags, struct sockaddr_in6 *srcAddr, uint32_t addrLen);
+int safeRecvfrom(int socketNum, void * buf, int len, UDPInfo*);
+int safeSendtoErr(int socketNum, void * buf, int len, UDPInfo*);
 
 // for the server side
 int udpServerSetup(int portNumber);
 
 // for the client side
-int setupUdpClientToServer(struct sockaddr_in6 *server, char * hostName, int portNumber);
+int setupUdpClientToServer(UDPInfo*, char * hostName, int portNumber);
 
+// returns true on timeout, else false
+bool select_call(int sock, int32_t seconds, int microseconds, bool set_null);
 
 #endif

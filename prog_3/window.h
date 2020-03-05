@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "networks.h"
 #include "rcopy_packets.h"
 
 #define PACKET_EXISTS -2
