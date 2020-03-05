@@ -3,3 +3,4 @@ prog_1/trace
 prog_2/server
 prog_2/cclient
 *.o
+*.old
