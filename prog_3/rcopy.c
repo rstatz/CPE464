@@ -7,6 +7,7 @@
 
 #include "debug.h"
 #include "cpe464.h"
+#include "window.h"
 #include "networks.h"
 #include "rcopy_packets.h"
 
@@ -151,6 +152,12 @@ static STATE FSM_setup_params(client_args* ca, int sock, UDPInfo* udp) {
 }
 
 static STATE FSM_data_rx(client_args* ca, int sock, UDPInfo* udp) {
+    //Window* w;
+    
+    // send RR1
+
+    //w = get_window(ca->wsize);
+    
     return TERMINATE;
 }
 

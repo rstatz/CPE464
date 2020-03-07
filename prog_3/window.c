@@ -1,6 +1,7 @@
 #include <string.h>
 #include <malloc.h>
 
+#include "debug.h"
 #include "window.h"
 
 // DOES NOT PROTECT AGAINST SEQUENCE NUMBER OVERFLOW
@@ -67,6 +68,7 @@ int buf_packet(Window* w, uint32_t seq, void* pack, int psize) {
             MOVE_CURR(w);
         }
 
+        p->psize = psize;
         p->seq = seq;
         memcpy((void*)p->pack, pack, psize);
     }
@@ -79,7 +81,7 @@ int buf_packet(Window* w, uint32_t seq, void* pack, int psize) {
 
 // gets packet with a given sequence number
 // returns NULL if packet does not exist
-void* get_packet(Window* w, uint32_t seq) {
+void* get_packet(Window* w, uint32_t seq, int* psize) {
     int seqi;
     Bufpacket* p;
 
@@ -92,7 +94,13 @@ void* get_packet(Window* w, uint32_t seq) {
     if (p->seq == 0) // check if packet exists
         return NULL;
 
+    *psize = p->psize;
+
     return (void*)p->pack;
+}
+
+void* get_lowest_packet(Window* w, int* psize) {
+    return get_packet(w, w->lwseq, psize);
 }
 
 // moves window forward once
@@ -121,6 +129,19 @@ int move_window_n(Window* w, int n) {
     return ret;
 }
 
+int move_window_seq(Window* w, uint32_t rr) {
+    int n;
+
+    if ((rr > (HIGHEST_WNDW_SEQ(w) - 1)) || (rr <= w->lwseq)) {
+        DEBUG_PRINT("wndw: cannot move window to seq %d, lwseq = %d", rr, w->lwseq);
+        return -1;
+    }
+
+    n = rr - w->lwseq;
+
+    return move_window_n(w, n);
+}
+
 bool isWindowClosed(Window* w) {
     return IS_WINDOW_CLOSED(w);
 }
@@ -129,4 +150,3 @@ void del_window(Window* w) {
     free(w->buf);
     free(w);
 }
-
