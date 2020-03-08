@@ -77,6 +77,7 @@ STATE FSM_setup_ack(int sock, void* pack, UDPInfo* udp) {
     uint8_t setup_ack_pack[MAX_PACK];
     uint8_t tries = MAX_ATTEMPTS;
     bool done = false;
+    int psize;
 
     build_setup_ack_pack((void*)setup_ack_pack); 
 
@@ -86,7 +87,7 @@ STATE FSM_setup_ack(int sock, void* pack, UDPInfo* udp) {
         if ((tries = select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, tries, udp)) == TIMEOUT_REACHED)
             return TERMINATE;
 
-        switch(recv_rc_pack(pack, MAX_PACK, sock, udp)) {
+        switch(recv_rc_pack(pack, MAX_PACK, &psize, sock, udp)) {
             case(FLAG_SETUP_PARAMS) :
                 DEBUG_PRINT("server: received setup params\n");
                 return GET_PARAMS;
@@ -105,6 +106,7 @@ STATE FSM_setup_ack(int sock, void* pack, UDPInfo* udp) {
 static STATE FSM_get_params(int sock, void* setup_params_pack, Window** w, UDPInfo* udp, SParams* sp) {
     uint8_t response_pack[MAX_PACK];
     uint8_t start_tx_pack[MAX_PACK];
+    int psize;
     char* fname;
 
     uint8_t tries = MAX_ATTEMPTS;
@@ -133,7 +135,7 @@ static STATE FSM_get_params(int sock, void* setup_params_pack, Window** w, UDPIn
     *w = get_window(sp->wsize);
 
     DEBUG_PRINT("server: good filename received, sending response\n");
-    build_setup_params_ack_pack((void*)&response_pack);
+    build_setup_params_ack_pack((void*)response_pack);
 
     // send filename_ack
     while (!done) {
@@ -142,9 +144,9 @@ static STATE FSM_get_params(int sock, void* setup_params_pack, Window** w, UDPIn
         if ((tries = select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, tries, udp)) == TIMEOUT_REACHED)
             return TERMINATE;
 
-        switch(recv_rc_pack((void*)start_tx_pack, MAX_PACK, sock, udp)) {
+        switch(recv_rc_pack((void*)start_tx_pack, MAX_PACK, &psize, sock, udp)) {
             case(FLAG_RR) :
-                DEBUG_PRINT("server: received RR"); // TODO check if 1?
+                DEBUG_PRINT("server: received RR 1\n"); // TODO check if 1?
                 return DATA_TX;
             case(CRC_ERROR) :
                 DEBUG_PRINT("server: CRC Error GET_PARAMS\n");
@@ -160,18 +162,19 @@ static STATE FSM_get_params(int sock, void* setup_params_pack, Window** w, UDPIn
 
 static STATE process_rx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
     uint8_t rx_pack[MAX_PACK];
+    int psize;
 
-    switch(recv_rc_pack((void*)rx_pack, MAX_PACK, sock, udp)) {
+    switch(recv_rc_pack((void*)rx_pack, MAX_PACK, &psize, sock, udp)) {
         case(FLAG_RR) :
-            DEBUG_PRINT("server: RCVD RR %d\n", ((RC_PHeader*)rx_pack)->seq);
-            if (move_window_seq(w, ((RC_PHeader*)rx_pack)->seq) < 0) {
+            DEBUG_PRINT("server: RCVD RR %d\n", RCSEQ(rx_pack));
+            if (move_window_seq(w, RCSEQ(rx_pack)) < 0) {
                 DEBUG_PRINT("server: error moving window\n");
             }
-            sp->maxrr = MAX(((RC_PHeader*)rx_pack)->seq, sp->maxrr);
+            sp->maxrr = MAX(RCSEQ(rx_pack), sp->maxrr);
             break;
         case(FLAG_SREJ) :
-            DEBUG_PRINT("server: RCVD SREJ %d\n", ((RC_PHeader*)rx_pack)->seq);
-            sp->srej_seq = ((RC_PHeader*)rx_pack)->seq;
+            DEBUG_PRINT("server: RCVD SREJ %d\n", RCSEQ(rx_pack));
+            sp->srej_seq = RCSEQ(rx_pack);
             return DATA_RECOV;
         case(CRC_ERROR) :
             DEBUG_PRINT("server: CRC Error DATA TX\n");
@@ -194,11 +197,14 @@ static STATE FSM_data_tx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
 
     while (!isWindowClosed(w) && !eof) { 
         // read from disk
-        if (((dlen = fread((void*)data, 1, sp->bsize, sp->read_fd)) < sp->bsize))
+        if (((dlen = fread((void*)data, 1, sp->bsize, sp->read_fd)) < sp->bsize)) {
+            DEBUG_PRINT("server: reached eof\n");
             eof = true;
+        }
         // send packet
         psize = build_data_pack((void*)tx_pack, sp->seq, (void*)data, dlen);
         buf_packet(w, sp->seq, (void*)tx_pack, psize);
+        DEBUG_PRINT("server: sending data seq %d, psize %d\n", sp->seq, psize); 
         sp->seq++;
         send_last_rc_build(sock, udp);
     
@@ -213,9 +219,10 @@ static STATE FSM_data_tx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
         timeout = MAX_ATTEMPTS;
         probe_pack = get_lowest_packet(w, &psize);
 
-        while (select_call(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT) && (timeout-- > 0)) {
+        while (select_call(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT) && (timeout > 0)) {
             // may just inch forward when it gets here, but its a rare case
             send_rc_pack(probe_pack, psize, sock, udp);
+            timeout--;
         }
         
         if (timeout == 0)
@@ -246,6 +253,30 @@ static STATE FSM_data_recov(int sock, Window* w, UDPInfo* udp, SParams* sp) {
         return TERMINATE;
     
     return process_rx(sock, w, udp, sp); // TODO confirm
+}
+
+static STATE FSM_send_eof(int sock, UDPInfo* udp, SParams* sp) {
+    uint8_t pack[MAX_PACK];
+    uint8_t eof_pack[RC_EOF_SIZE];
+    static int timeout = MAX_ATTEMPTS;
+    int psize;
+
+    build_eof_pack((void*)eof_pack);
+   
+    if (select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, timeout, udp) == TIMEOUT_REACHED)
+        return TERMINATE;
+ 
+    switch(recv_rc_pack((void*)pack, MAX_PACK, &psize, sock, udp)) {
+        case(FLAG_EOF_ACK) :
+            return TERMINATE;
+        case(CRC_ERROR) :
+            break;
+        default :
+            DEBUG_PRINT("server: received bad packet in SEND_EOF\n");
+            break;
+    }
+
+    return SEND_EOF;
 }
 
 // returns true if main server, else false
@@ -279,10 +310,9 @@ static bool handle_client(UDPInfo* udp) {
             case(GET_PARAMS) :
                 DEBUG_PRINT("server: parsing setup params\n");
                 state = FSM_get_params(client_sock, pack, &w, udp, &sp); 
-                state = TERMINATE; // temp for testing
                 break;
             case(DATA_TX) :
-                DEBUG_PRINT("server: transmitting file data\n");
+                //DEBUG_PRINT("server: transmitting file data\n");
                 state = FSM_data_tx(client_sock, w, udp, &sp);
                 break;
             case(DATA_RECOV) :
@@ -291,6 +321,7 @@ static bool handle_client(UDPInfo* udp) {
                 break;
             case(SEND_EOF) :
                 DEBUG_PRINT("server: ending file transfer\n");
+                state = FSM_send_eof(client_sock, udp, &sp);
                 break;
             case(TERMINATE) :
                 DEBUG_PRINT("server: sayonara\n");
@@ -314,7 +345,8 @@ static void start_server(int port) {
     int flag, server_sock;
     uint8_t pack[MAX_PACK];
     UDPInfo udp = {{0}};
- 
+    int psize; 
+
     DEBUG_PRINT("Starting Server\n");
 
  	server_sock = udpServerSetup(port);
@@ -322,7 +354,7 @@ static void start_server(int port) {
     while(1) {
         select_call(server_sock, 0, 0, !USE_TIMEOUT);
         
-        flag = recv_rc_pack((void*)pack, MAX_PACK, server_sock, &udp);
+        flag = recv_rc_pack((void*)pack, MAX_PACK, &psize, server_sock, &udp);
     
         DEBUG_PRINT("CONNECTED IP=%s\n", ipAddressToString(&udp.addr));
         DEBUG_PRINT("iplen = %d\n", udp.addr_len);

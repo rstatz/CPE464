@@ -51,7 +51,7 @@ int build_data_pack(void* buf, uint32_t seq, void* data, int len) {
 
 int build_rr_pack(void* buf, uint32_t seq) {
     g_last_pack = buf;
-    g_len = build_rc_header(0, FLAG_RR, (RC_PHeader*)buf);
+    g_len = build_rc_header(seq, FLAG_RR, (RC_PHeader*)buf);
 
     return g_len;
 }
@@ -86,9 +86,9 @@ int build_setup_params_ack_pack(void* buf) {
     return g_len;
 }
 
-int build_eof_pack(void* buf, uint32_t seq) {
+int build_eof_pack(void* buf) {
     g_last_pack = buf;
-    g_len = build_rc_header(seq, FLAG_EOF, (RC_PHeader*)buf);
+    g_len = build_rc_header(0, FLAG_EOF, (RC_PHeader*)buf);
 
     return g_len;
 }
@@ -136,20 +136,19 @@ int send_rc_setup_params_pack(void* buf, int sock, UDPInfo* udp) {
 
 // only returns data from a single datagram no matter buffer length
 // returns flag of packet, CRC_ERROR if error, -1 if other error
-int recv_rc_pack(void* buf, int len, int sock, UDPInfo* udp) {
+int recv_rc_pack(void* buf, int len, int* psize, int sock, UDPInfo* udp) {
     int recv_len;
     uint16_t ck_sum;    
 
     recv_len = (len < MAX_PACK) ? len : MAX_PACK;
     recv_len = safeRecvfrom(sock, buf, recv_len, udp);
 
+    *psize = recv_len;
+    
     if (recv_len < sizeof(RC_PHeader))
         return -1;
 
     ck_sum = in_cksum((unsigned short*)buf, recv_len);
-
-//    DEBUG_PRINT("RECV_LEN = %d\n", recv_len);
-//    DEBUG_PRINT("CHECKSUM = %d\n", ck_sum);
 
     if (ck_sum != VALID_CHECKSUM)
         return CRC_ERROR;
@@ -164,6 +163,12 @@ void parse_setup_params(void* buf, uint16_t* wsize, uint16_t* bsize, char** fnam
     *bsize = ntohs(pack->bsize);
 
     *fname = (char*)(pack + 1);
+}
+
+void* parse_data_pack(void* buf, int psize, int* dsize) {
+    *dsize = psize - sizeof(RC_PHeader);
+
+    return (void*)(((uint8_t*)buf) + sizeof(RC_PHeader));
 }
 
 // returns select times out n times, false otherwise

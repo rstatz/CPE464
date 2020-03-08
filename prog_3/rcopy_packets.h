@@ -21,8 +21,10 @@ typedef struct RC_PHeader {
 #define TIMEOUT_VALUE_S 1
 #define TIMEOUT_REACHED 0
 
+#define RCSEQ(X) (ntohl(((RC_PHeader*)X)->seq))
+
 int send_rc_pack(void* buf, int len, int sock, UDPInfo*);
-int recv_rc_pack(void* buf, int len, int sock, UDPInfo*);
+int recv_rc_pack(void* buf, int len, int* psize, int sock, UDPInfo*);
 
 int send_last_rc_build(int sock, UDPInfo* udp);
 int select_resend_n(int sock, int seconds, int microseconds, bool set_null, int num_tries, UDPInfo*);
@@ -42,15 +44,18 @@ int build_setup_ack_pack(void*);
 // | header | data |
 #define FLAG_DATA 3
 int build_data_pack(void* buf, uint32_t seq, void* data, int len); 
+void* parse_data_pack(void* buf, int psize, int* dsize);
 
 // Flag = 5 : RR
 // | header |
 #define FLAG_RR 5
+#define RC_RR_SIZE sizeof(RC_PHeader)
 int build_rr_pack(void*, uint32_t seq);
 
 // Flag = 6 : SREJ
 // | header |
 #define FLAG_SREJ 6
+#define RC_SREJ_SIZE sizeof(RC_PHeader)
 int build_srej_pack(void*, uint32_t seq);
 
 // Flag = 7 : Setup parameters (rcopy to server)
@@ -77,11 +82,13 @@ int build_setup_params_ack_pack(void*);
 // Flag 9 : EOF (server to rcopy)
 // | header |
 #define FLAG_EOF 9
-int build_eof_pack(void*, uint32_t seq);
+#define RC_EOF_SIZE sizeof(RC_PHeader)
+int build_eof_pack(void*);
 
 // Flag 10 : EOF_ACK (rcopy to server)
 // | header |
 #define FLAG_EOF_ACK 10
+#define RC_EOF_ACK_SIZE sizeof(RC_PHeader)
 int build_eof_ack_pack(void*);
 
 // Flag 11 : Bad filename

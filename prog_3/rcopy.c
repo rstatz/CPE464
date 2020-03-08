@@ -26,6 +26,8 @@ typedef struct client_args {
     float err;
 
     FILE* write_fd;
+
+    int maxrr;
 } client_args;
 
 void usage() {
@@ -34,6 +36,8 @@ void usage() {
 }
 
 void get_args(int argc, char* argv[], client_args* ca) {
+    ca->write_fd = NULL;
+
     if (argc != 8)
         usage();
 
@@ -83,6 +87,7 @@ static STATE FSM_setup(client_args* ca, int* sock, UDPInfo* udp) {
     uint8_t setup_ack_pack[sizeof(RC_PHeader)];
     uint8_t tries = MAX_ATTEMPTS;
     bool done = false;
+    int psize;
 
     // check write file
     if ((ca->write_fd = fopen(ca->to_fname, "w")) < 0) {
@@ -92,7 +97,8 @@ static STATE FSM_setup(client_args* ca, int* sock, UDPInfo* udp) {
 
     // setup client socket
     *sock = setupUdpClientToServer(udp, ca->rname, ca->port);   
-    
+    udp->sock = *sock;   
+ 
     // setup packet
     build_setup_pack((void*)setup_pack);
 
@@ -103,7 +109,7 @@ static STATE FSM_setup(client_args* ca, int* sock, UDPInfo* udp) {
             return TERMINATE;
 
         // check recv flag
-        switch(recv_rc_pack((void*)&setup_ack_pack, MAX_PACK, *sock, udp)) {
+        switch(recv_rc_pack((void*)setup_ack_pack, MAX_PACK, &psize, *sock, udp)) {
             case(FLAG_SETUP_ACK) :
                 return SETUP_PARAMS;
             case(CRC_ERROR) :
@@ -118,13 +124,14 @@ static STATE FSM_setup(client_args* ca, int* sock, UDPInfo* udp) {
     return TERMINATE;
 }
 
-static STATE FSM_setup_params(client_args* ca, int sock, UDPInfo* udp) {
+static STATE FSM_setup_params(client_args* ca, Window** w, int sock, UDPInfo* udp) {
     uint8_t sp_pack[MAX_PACK];
     uint8_t sp_ack_pack[MAX_PACK];
     uint8_t tries = MAX_ATTEMPTS;
     bool done = false;
+    int psize;
     
-    build_setup_params_pack((void*)&sp_pack, ca->wsize, ca->bsize, ca->from_fname);
+    build_setup_params_pack((void*)sp_pack, ca->wsize, ca->bsize, ca->from_fname);
     
     while (!done) {
         done = true; //assume success
@@ -132,9 +139,12 @@ static STATE FSM_setup_params(client_args* ca, int sock, UDPInfo* udp) {
         if ((tries = select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, tries, udp)) == TIMEOUT_REACHED)
             return TERMINATE;
 
-        switch(recv_rc_pack((void*)&sp_ack_pack, MAX_PACK, sock, udp)) {
+        switch(recv_rc_pack((void*)sp_ack_pack, MAX_PACK, &psize, sock, udp)) {
             case(FLAG_SETUP_PARAMS_ACK) :
                 DEBUG_PRINT("rcopy: to filename accepted\n");
+                // Pre RX setup
+                *w = get_window(ca->wsize);
+                ca->maxrr = 1;
                 return DATA_RX;
             case(FLAG_BAD_FNAME) :
                 fprintf(stderr, "rcopy: Invalid input filepath\n");
@@ -151,19 +161,79 @@ static STATE FSM_setup_params(client_args* ca, int sock, UDPInfo* udp) {
     return TERMINATE;
 }
 
-static STATE FSM_data_rx(client_args* ca, int sock, UDPInfo* udp) {
-    //Window* w;
-    
-    // send RR1
+static void send_srej(int seq, UDPInfo* udp) {
+    uint8_t srej_pack[RC_SREJ_SIZE];
 
-    //w = get_window(ca->wsize);
+    DEBUG_PRINT("rcopy: sending SREJ %d\n", seq);
+
+    build_srej_pack((void*)srej_pack, seq);
+    send_last_rc_build(udp->sock, udp);
+}
+
+static void process_rx(client_args* ca, Window* w, void* data_pack, int psize, UDPInfo* udp) {
+    int dsize;
+    void* data; 
     
-    return TERMINATE;
+    buf_packet(w, RCSEQ(data_pack), data_pack, psize);
+
+    // determine if SREJ needs to be sent
+    if (RCSEQ(data_pack) > ca->maxrr) {
+        DEBUG_PRINT("rcopy: srej detected, rcv seq %d, %d\n", RCSEQ(data_pack), psize);
+        send_srej(ca->maxrr, udp);
+    }
+
+    // write any available data
+    while ((data = get_lowest_packet(w, &psize)) != NULL) {
+        parse_data_pack(data, psize, &dsize);
+
+        if (move_window_n(w, 1) < 0) { // move window forward once
+            DEBUG_PRINT("issue\n");
+        }
+
+        if (fwrite(data, 1, dsize, ca->write_fd) < dsize) {
+            DEBUG_PRINT("rcopy: failed to write all data\n");
+        }
+
+        ca->maxrr = RCSEQ(data) + 1;
+    }
+}
+
+static STATE FSM_data_rx(client_args* ca, Window* w, int sock, UDPInfo* udp) {  
+    uint8_t rr_pack[RC_RR_SIZE];
+    uint8_t rx_pack[MAX_PACK];
+    uint8_t eof_ack_pack[RC_EOF_ACK_SIZE];
+    uint8_t tries = MAX_ATTEMPTS;
+    int psize;
+
+    build_rr_pack((void*)rr_pack, ca->maxrr);
+
+    if ((select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, tries, udp)) == TIMEOUT_REACHED)
+        return TERMINATE;
+
+    switch(recv_rc_pack((void*)rx_pack, MAX_PACK, &psize, sock, udp)) {
+        case(FLAG_DATA) :
+            process_rx(ca, w, (void*)rx_pack, psize, udp);
+            break;
+        case(FLAG_EOF) :
+            build_eof_ack_pack((void*)eof_ack_pack);
+            send_last_rc_build(sock, udp);
+            return TERMINATE;
+        case(CRC_ERROR) :
+            // TODO ignore?
+            break;
+        default:
+            DEBUG_PRINT("ropy: received bad packet in DATA_RX\n");
+            return TERMINATE;
+            break;
+    }
+    
+    return DATA_RX;
 }
 
 static void start_rcopy(client_args* ca) {
     STATE state = SETUP;
     UDPInfo udp = {{0}};
+    Window* w = NULL;
     int client_sock = 0; 
     bool run = true;
     
@@ -175,16 +245,18 @@ static void start_rcopy(client_args* ca) {
                 break;
             case(SETUP_PARAMS) :
                 DEBUG_PRINT("rcopy: sending setup params\n");
-                state = FSM_setup_params(ca, client_sock, &udp);
+                state = FSM_setup_params(ca, &w, client_sock, &udp);
                 break;
             case(DATA_RX) :
-                DEBUG_PRINT("rcopy: starting data Rx\n");
-                state = FSM_data_rx(ca, client_sock, &udp);
+                //DEBUG_PRINT("rcopy: starting data Rx\n");
+                state = FSM_data_rx(ca, w, client_sock, &udp);
                 break;
             case(TERMINATE) :
-                fclose(ca->write_fd);
+                if (ca->write_fd != NULL) fclose(ca->write_fd);
+                if (w != NULL) del_window(w);
                 close(client_sock);
                 run = false;
+                DEBUG_PRINT("rcopy: sayonara\n");
                 break;
             default:
                 DEBUG_PRINT("rcopy FSM: bad state\n");
