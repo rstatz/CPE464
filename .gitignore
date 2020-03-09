@@ -5,3 +5,5 @@ prog_2/cclient
 *.o
 *.old
 libcpe464/
+*.gz
+*.tar
