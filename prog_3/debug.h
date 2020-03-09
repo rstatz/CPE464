@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#define DEBUG // define to enable DEBUG_PRINT
+//#define DEBUG // define to enable DEBUG_PRINT
 
 #ifdef DEBUG
     #define DEBUG_PRINT(str, args...) printf(str, ##args)

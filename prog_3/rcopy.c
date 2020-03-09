@@ -275,7 +275,13 @@ int main(int argc, char* argv[]) {
 
     get_args(argc, argv, &ca);
 
-    sendErr_init(ca.err, DROP_ON, FLIP_ON, DEBUG_ON, RSEED_ON); // TODO debug off
+    sendErr_init(ca.err, DROP_ON, FLIP_ON, 
+    #ifdef DEBUG
+        DEBUG_ON, 
+    #else
+        DEBUG_OFF,
+    #endif
+        RSEED_ON);
 
     start_rcopy(&ca);
 

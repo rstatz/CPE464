@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 #include <sys/select.h>
 
 #include "debug.h"
@@ -12,7 +14,7 @@
 #include "rcopy_packets.h"
 #include "gethostbyname.h"
 
-#define RESEND_TRIES 10
+#define NEW_CLIENT_TIMEOUT_S 10
 
 #define TFER_DONE(SP) (SP->maxrr == SP->seq)
 
@@ -34,6 +36,9 @@ typedef enum STATE {TERMINATE=-1,
 typedef struct SParams {
     uint16_t wsize, bsize;
     uint32_t seq;
+
+    float err;
+    int port;
     
     uint32_t srej_seq;
     uint32_t maxrr; // maximum rr received to date
@@ -41,32 +46,55 @@ typedef struct SParams {
     FILE* read_fd;
 } SParams;
 
+static void init_sp(SParams* sp) {
+    sp->seq = 1;
+    sp->maxrr = 0;
+    sp->read_fd = NULL;
+}
+
 static void usage() {
     fprintf(stderr, "Usage: server error-percent [port-number]\n");
     exit(EXIT_FAILURE);
 }
 
-static void get_args(int argc, char* argv[], float* err, int* port) {
+static void get_args(int argc, char* argv[], SParams* sp) {
     if (argc > 3 || argc < 2)
         usage();
     
-    *err = strtof(argv[1], NULL);
+    sp->err = strtof(argv[1], NULL);
     if (errno != 0)
         usage();
-    if ((*err > 100) || (*err < 0)) {
+    if ((sp->err > 100) || (sp->err < 0)) {
         fprintf(stderr, "Invalid error-percent (0 to 100)\n");       
         usage();
     }
 
-    *port = (argc == 3) ? atoi(argv[2]) : 0;
+    sp->port = (argc == 3) ? atoi(argv[2]) : 0;
 }
 
-STATE FSM_setup_client(int* sock) {
-    // TODO fork
-    // server returns SERVER_PROCESS
+STATE FSM_setup_client(int* sock, SParams* sp) {
+    pid_t pid;
+    
+    if ((pid = fork()) < 0) {
+        perror("fork");
+        exit(EXIT_FAILURE);
+    }
+    
+    if (pid != 0) { // server
+        return SERVER_PROCESS;
+    }
+
+    // child
+    sendErr_init(sp->err, DROP_ON, FLIP_ON, 
+        #ifdef DEBUG 
+            DEBUG_ON, 
+        #else
+            DEBUG_OFF, 
+        #endif
+            RSEED_ON);
 
     // close server socket?
-
+    
     // get new client socket
     *sock = get_UDP_socket();
 
@@ -292,19 +320,13 @@ static STATE FSM_send_eof(int sock, UDPInfo* udp, SParams* sp) {
 }
 
 // returns true if main server, else false
-static bool handle_client(UDPInfo* udp) {
+static bool handle_client(SParams* sp, UDPInfo* udp) {
     STATE state = SETUP;
     int client_sock = 0;
-    SParams sp = {0};
     Window* w = NULL;
 
     uint8_t pack[MAX_PACK]; // allows passing packets between states
     bool run = true;
- 
-    // Init SP
-    sp.seq = 1;
-    sp.maxrr = 0;
-    sp.read_fd = NULL;
    
     while(run) {
         switch(state) {
@@ -313,7 +335,7 @@ static bool handle_client(UDPInfo* udp) {
                 return true;
             case(SETUP) :
                 DEBUG_PRINT("server: setting up new client\n");
-                state = FSM_setup_client(&client_sock);
+                state = FSM_setup_client(&client_sock, sp);
                 break;
             case(SETUP_ACK) :
                 DEBUG_PRINT("server: acknowledging new client\n");
@@ -321,30 +343,27 @@ static bool handle_client(UDPInfo* udp) {
                 break;
             case(GET_PARAMS) :
                 DEBUG_PRINT("server: parsing setup params\n");
-                state = FSM_get_params(client_sock, pack, &w, udp, &sp); 
+                state = FSM_get_params(client_sock, (void*)pack, &w, udp, sp); 
                 break;
             case(DATA_TX) :
-                //DEBUG_PRINT("server: transmitting file data\n");
-                state = FSM_data_tx(client_sock, w, udp, &sp);
+                state = FSM_data_tx(client_sock, w, udp, sp);
                 break;
             case(DATA_RECOV) :
                 DEBUG_PRINT("server: responding to srej\n");
-                state = FSM_data_recov(client_sock, w, udp, &sp);
+                state = FSM_data_recov(client_sock, w, udp, sp);
                 break;
             case(SEND_EOF) :
                 DEBUG_PRINT("server: ending file transfer\n");
-                state = FSM_send_eof(client_sock, udp, &sp);
+                state = FSM_send_eof(client_sock, udp, sp);
                 break;
             case(TERMINATE) :
                 DEBUG_PRINT("server: sayonara\n");
-                if (sp.read_fd != NULL) fclose(sp.read_fd);
+                if (sp->read_fd != NULL) fclose(sp->read_fd);
                 if (w != NULL) del_window(w);
-                close(client_sock);
-                // TODO remove run = false
-                run = false;
+                return false;
                 break;
             default:
-                DEBUG_PRINT("Server FSM: bad state\n");
+                DEBUG_PRINT("server FSM: bad state\n");
                 state = TERMINATE;
                 break;
         }
@@ -353,53 +372,68 @@ static bool handle_client(UDPInfo* udp) {
     return false;
 }
 
-static void start_server(int port) {
-    int flag, server_sock;
-    uint8_t pack[MAX_PACK];
+// returns true for server, false for child
+static bool handle_new_client(int server_sock, SParams* sp) {
+    int flag, psize;
     UDPInfo udp = {{0}};
-    int psize; 
+    uint8_t pack[MAX_PACK];
+
+    flag = recv_rc_pack((void*)pack, MAX_PACK, &psize, server_sock, &udp);
+    
+    DEBUG_PRINT("CONNECTED IP=%s\n", ipAddressToString(&udp.addr));
+    DEBUG_PRINT("iplen = %d\n", udp.addr_len);
+  
+    switch(flag) {
+        case(FLAG_SETUP):
+            DEBUG_PRINT("main_server: valid connection request\n");
+            return handle_client(sp, &udp);
+        case(CRC_ERROR):
+            DEBUG_PRINT("main_server: CRC_ERROR\n");
+            break;
+        default:
+            DEBUG_PRINT("main_server: bad packet received\n");
+            break;
+    }
+
+    return true;
+}
+
+// Note, with current implementation, zombies will pile up if tons of connection requests
+static void start_server(SParams* sp) {
+    int server_sock, status = 0;
 
     DEBUG_PRINT("Starting Server\n");
 
- 	server_sock = udpServerSetup(port);
+ 	server_sock = udpServerSetup(sp->port);
 
     while(1) {
-        select_call(server_sock, 0, 0, !USE_TIMEOUT);
-        
-        flag = recv_rc_pack((void*)pack, MAX_PACK, &psize, server_sock, &udp);
-    
-        DEBUG_PRINT("CONNECTED IP=%s\n", ipAddressToString(&udp.addr));
-        DEBUG_PRINT("iplen = %d\n", udp.addr_len);
-      
-        switch(flag) {
-            case(FLAG_SETUP):
-                DEBUG_PRINT("main_server: valid connection request\n");
-                if (handle_client(&udp)) // main server
-                    break;
-                return; // server children
-            case(CRC_ERROR):
-                DEBUG_PRINT("main_server: CRC_ERROR\n");
-                break;
-            default:
-                DEBUG_PRINT("main_server: bad packet received\n");
-                break;
+        if (select_call(server_sock, NEW_CLIENT_TIMEOUT_S, 0, USE_TIMEOUT)) {
+            while(waitpid(-1, &status, WNOHANG) > 0); // check on children
+        } else { // new client request
+            if (!handle_new_client(server_sock, sp)) break;
         }
     }
 }
 
 int main(int argc, char* argv[]) {
-    float err = 0;
-    int port;
+    SParams sp = {0};
 
     #ifdef DEBUG
         setvbuf(stdout, NULL, _IONBF, 0);
     #endif
     
-    get_args(argc, argv, &err, &port);
+    init_sp(&sp);
+    get_args(argc, argv, &sp);
 
-    sendErr_init(err, DROP_ON, FLIP_ON, DEBUG_ON, RSEED_ON); // TODO debug off
-    
-    start_server(port);
+    sendErr_init(sp.err, DROP_ON, FLIP_ON, 
+        #ifdef DEBUG 
+            DEBUG_ON, 
+        #else
+            DEBUG_OFF, 
+        #endif
+            RSEED_ON);
+   
+    start_server(&sp);
 
     exit(EXIT_SUCCESS);
 }
