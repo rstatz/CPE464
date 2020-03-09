@@ -21,7 +21,7 @@
 #define IN_SEQ_RANGE(W, SEQ, USEQ) ((SEQ >= W->lwseq) && (SEQ <= USEQ))
 
 void clear_buf(Bufpacket* buf, int bufsize) {
-    while(bufsize--) buf->seq = 0;
+    while(bufsize--) (buf++)->seq = 0;
 }
 
 Window* get_window(int wsize) {
@@ -62,7 +62,7 @@ int buf_packet(Window* w, uint32_t seq, void* pack, int psize) {
         if (p->seq != 0) // packet exists
             return PACKET_EXISTS;
 
-        if (!IN_SEQ_RANGE(w, seq, w->cseq)) { // move current if not within current window
+        if (!IN_SEQ_RANGE(w, seq, w->cseq - 1)) { // move current if not within current window
             w->cseq = seq + 1;
             w->curr = p;
             MOVE_CURR(w);
@@ -124,15 +124,17 @@ int move_window(Window* w) {
 int move_window_n(Window* w, int n) {
     int ret = 0;
 
-    while(n-- && ((ret = move_window(w)) > 0));
+    DEBUG_PRINT("wndw: moving %d\n", n);
 
+    while(n > 0 && ((ret = move_window(w)) == 0)) n--;
+ 
     return ret;
 }
 
 int move_window_seq(Window* w, uint32_t rr) {
     int n;
 
-    if ((rr > (HIGHEST_WNDW_SEQ(w) - 1)) || (rr <= w->lwseq)) {
+    if ((rr > w->cseq) || (rr <= w->lwseq)) {
         DEBUG_PRINT("wndw: cannot move window to seq %d, lwseq = %d\n", rr, w->lwseq);
         return -1;
     }

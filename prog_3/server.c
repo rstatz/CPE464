@@ -14,7 +14,7 @@
 
 #define RESEND_TRIES 10
 
-#define TFER_DONE(SP) (SP->maxrr > SP->seq)
+#define TFER_DONE(SP) (SP->maxrr == SP->seq)
 
 #define MAX(X,Y) ((X) > (Y) ? (X) : (Y))
 
@@ -36,7 +36,7 @@ typedef struct SParams {
     uint32_t seq;
     
     uint32_t srej_seq;
-    uint32_t maxrr;
+    uint32_t maxrr; // maximum rr received to date
 
     FILE* read_fd;
 } SParams;
@@ -171,6 +171,7 @@ static STATE process_rx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
                 DEBUG_PRINT("server: error moving window\n");
             }
             sp->maxrr = MAX(RCSEQ(rx_pack), sp->maxrr);
+            printf("maxrr = %d\n", sp->maxrr);
             break;
         case(FLAG_SREJ) :
             DEBUG_PRINT("server: RCVD SREJ %d\n", RCSEQ(rx_pack));
@@ -199,28 +200,34 @@ static STATE FSM_data_tx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
         // read from disk
         if (((dlen = fread((void*)data, 1, sp->bsize, sp->read_fd)) < sp->bsize)) {
             DEBUG_PRINT("server: reached eof\n");
+            
             eof = true;
         }
-        // send packet
+        
+        // buffer and send packet
         psize = build_data_pack((void*)tx_pack, sp->seq, (void*)data, dlen);
         buf_packet(w, sp->seq, (void*)tx_pack, psize);
         DEBUG_PRINT("server: sending data seq %d, psize %d\n", sp->seq, psize); 
         sp->seq++;
-        send_last_rc_build(sock, udp);
+        printf("sp->seq = %d\n", sp->seq);
+        send_rc_pack((void*)tx_pack, psize, sock, udp);
     
+        if(eof)
+            break;
+        
         // receive all packets
         while(!select_call(sock, 0, 0, USE_TIMEOUT)) {
             if (process_rx(sock, w, udp, sp) == DATA_RECOV)
                 return DATA_RECOV;
         }
     }
-    
+
     while (isWindowClosed(w) || eof) {
         timeout = MAX_ATTEMPTS;
-        probe_pack = get_lowest_packet(w, &psize);
 
         while (select_call(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT) && (timeout > 0)) {
             // may just inch forward when it gets here, but its a rare case
+            probe_pack = get_lowest_packet(w, &psize);
             send_rc_pack(probe_pack, psize, sock, udp);
             timeout--;
         }
@@ -229,10 +236,12 @@ static STATE FSM_data_tx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
             return TERMINATE;
         
         if (process_rx(sock, w, udp, sp) == DATA_RECOV)
-            return DATA_RECOV;
-   
+            return DATA_RECOV; 
+
+        printf("TFER=%s\n", TFER_DONE(sp) ? "done" : "not done");
+
         if (eof && TFER_DONE(sp))
-            return SEND_EOF;
+            return SEND_EOF; 
     }
 
     return DATA_TX;
@@ -382,7 +391,7 @@ int main(int argc, char* argv[]) {
     #ifdef DEBUG
         setvbuf(stdout, NULL, _IONBF, 0);
     #endif
-
+    
     get_args(argc, argv, &err, &port);
 
     sendErr_init(err, DROP_ON, FLIP_ON, DEBUG_ON, RSEED_ON); // TODO debug off

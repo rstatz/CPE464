@@ -170,31 +170,31 @@ static void send_srej(int seq, UDPInfo* udp) {
     send_last_rc_build(udp->sock, udp);
 }
 
-static void process_rx(client_args* ca, Window* w, void* data_pack, int psize, UDPInfo* udp) {
+static void process_rx(client_args* ca, Window* w, void* new_data_pack, int psize, UDPInfo* udp) {
     int dsize;
-    void* data; 
+    void *write_data_pack, *write_data; 
     
-    buf_packet(w, RCSEQ(data_pack), data_pack, psize);
+    buf_packet(w, RCSEQ(new_data_pack), new_data_pack, psize);
 
     // determine if SREJ needs to be sent
-    if (RCSEQ(data_pack) > ca->maxrr) {
-        DEBUG_PRINT("rcopy: srej detected, rcv seq %d, %d\n", RCSEQ(data_pack), psize);
+    if (RCSEQ(new_data_pack) > ca->maxrr) {
+        DEBUG_PRINT("rcopy: srej detected, rcv seq %d, %d\n", RCSEQ(new_data_pack), psize);
         send_srej(ca->maxrr, udp);
     }
 
     // write any available data
-    while ((data = get_lowest_packet(w, &psize)) != NULL) {
-        parse_data_pack(data, psize, &dsize);
+    while ((write_data_pack = get_lowest_packet(w, &psize)) != NULL) {
+        write_data = parse_data_pack(write_data_pack, psize, &dsize);
 
-        if (move_window_n(w, 1) < 0) { // move window forward once
-            DEBUG_PRINT("issue\n");
-        }
+        move_window_n(w, 1); // move window forward once
 
-        if (fwrite(data, 1, dsize, ca->write_fd) < dsize) {
+        DEBUG_PRINT("rcopy: writing data seq %d, psize %d\n", RCSEQ(write_data_pack), psize);
+
+        if (fwrite(write_data, 1, dsize, ca->write_fd) < dsize) {
             DEBUG_PRINT("rcopy: failed to write all data\n");
         }
 
-        ca->maxrr = RCSEQ(data) + 1;
+        ca->maxrr = RCSEQ(write_data_pack) + 1;
     }
 }
 
@@ -205,6 +205,7 @@ static STATE FSM_data_rx(client_args* ca, Window* w, int sock, UDPInfo* udp) {
     uint8_t tries = MAX_ATTEMPTS;
     int psize;
 
+    DEBUG_PRINT("rcopy: sending rr %d\n", ca->maxrr);
     build_rr_pack((void*)rr_pack, ca->maxrr);
 
     if ((select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, tries, udp)) == TIMEOUT_REACHED)
@@ -219,11 +220,9 @@ static STATE FSM_data_rx(client_args* ca, Window* w, int sock, UDPInfo* udp) {
             send_last_rc_build(sock, udp);
             return TERMINATE;
         case(CRC_ERROR) :
-            // TODO ignore?
             break;
         default:
-            DEBUG_PRINT("ropy: received bad packet in DATA_RX\n");
-            return TERMINATE;
+            DEBUG_PRINT("rcopy: received bad packet in DATA_RX\n");
             break;
     }
     

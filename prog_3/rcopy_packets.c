@@ -41,7 +41,7 @@ int build_data_pack(void* buf, uint32_t seq, void* data, int len) {
 
     build_rc_header(seq, FLAG_DATA, head);
 
-    memcpy((void*)(((RC_PHeader*)buf) + 1), data, len);
+    memcpy((void*)(head + 1), data, len);
 
     g_last_pack = buf;
     g_len = len + sizeof(RC_PHeader);

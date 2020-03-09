@@ -5,7 +5,7 @@
 
 typedef struct RC_PHeader {
     uint32_t seq; // network order
-    uint32_t crc; // network order
+    uint16_t crc; // network order
     uint8_t flag;
 } __attribute__((packed)) RC_PHeader;
 

@@ -7,7 +7,7 @@
 # note - if you are moving between machine architectures you must first delete your .o files
 
 CC = gcc
-CFLAGS = -g -Wall -Werror 
+CFLAGS = -g -Wall 
 
 LIBS += -lstdc++ -ldl
 SRCS = $(shell ls *.cpp *.c 2> /dev/null | grep -v rcopy.c | grep -v server.c | grep -v rcopy.cpp | grep -v server.cpp )
