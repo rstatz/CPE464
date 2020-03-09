@@ -164,7 +164,7 @@ static STATE FSM_setup_params(client_args* ca, Window** w, int sock, UDPInfo* ud
 static void send_srej(int seq, UDPInfo* udp) {
     uint8_t srej_pack[RC_SREJ_SIZE];
 
-    DEBUG_PRINT("rcopy: sending SREJ %d\n", seq);
+    //DEBUG_PRINT("rcopy: sending SREJ %d\n", seq);
 
     build_srej_pack((void*)srej_pack, seq);
     send_last_rc_build(udp->sock, udp);
@@ -205,7 +205,7 @@ static STATE FSM_data_rx(client_args* ca, Window* w, int sock, UDPInfo* udp) {
     uint8_t tries = MAX_ATTEMPTS;
     int psize;
 
-    DEBUG_PRINT("rcopy: sending rr %d\n", ca->maxrr);
+    //DEBUG_PRINT("rcopy: sending rr %d\n", ca->maxrr);
     build_rr_pack((void*)rr_pack, ca->maxrr);
 
     if ((select_resend_n(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT, tries, udp)) == TIMEOUT_REACHED)
@@ -220,6 +220,7 @@ static STATE FSM_data_rx(client_args* ca, Window* w, int sock, UDPInfo* udp) {
             send_last_rc_build(sock, udp);
             return TERMINATE;
         case(CRC_ERROR) :
+            //send_srej(ca->maxrr, udp);
             break;
         default:
             DEBUG_PRINT("rcopy: received bad packet in DATA_RX\n");

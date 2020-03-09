@@ -163,18 +163,23 @@ static STATE FSM_get_params(int sock, void* setup_params_pack, Window** w, UDPIn
 static STATE process_rx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
     uint8_t rx_pack[MAX_PACK];
     int psize;
+    void* pack;
 
     switch(recv_rc_pack((void*)rx_pack, MAX_PACK, &psize, sock, udp)) {
         case(FLAG_RR) :
-            DEBUG_PRINT("server: RCVD RR %d\n", RCSEQ(rx_pack));
-            if (move_window_seq(w, RCSEQ(rx_pack)) < 0) {
-                DEBUG_PRINT("server: error moving window\n");
+            //DEBUG_PRINT("server: RCVD RR %d\n", RCSEQ(rx_pack));
+            if (sp->maxrr == RCSEQ(rx_pack)) {
+                // received duplicate rr
+                if((pack = get_packet(w, RCSEQ(rx_pack), &psize)) != NULL)
+                    send_rc_pack(pack, psize, sock, udp); 
+            } else {
+                move_window_seq(w, RCSEQ(rx_pack));
+                sp->maxrr = MAX(RCSEQ(rx_pack), sp->maxrr);
             }
-            sp->maxrr = MAX(RCSEQ(rx_pack), sp->maxrr);
-            printf("maxrr = %d\n", sp->maxrr);
+            //DEBUG_PRINT("maxrr = %d\n", sp->maxrr);
             break;
         case(FLAG_SREJ) :
-            DEBUG_PRINT("server: RCVD SREJ %d\n", RCSEQ(rx_pack));
+            //DEBUG_PRINT("server: RCVD SREJ %d\n", RCSEQ(rx_pack));
             sp->srej_seq = RCSEQ(rx_pack);
             return DATA_RECOV;
         case(CRC_ERROR) :
@@ -209,7 +214,6 @@ static STATE FSM_data_tx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
         buf_packet(w, sp->seq, (void*)tx_pack, psize);
         DEBUG_PRINT("server: sending data seq %d, psize %d\n", sp->seq, psize); 
         sp->seq++;
-        printf("sp->seq = %d\n", sp->seq);
         send_rc_pack((void*)tx_pack, psize, sock, udp);
     
         if(eof)
@@ -238,8 +242,6 @@ static STATE FSM_data_tx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
         if (process_rx(sock, w, udp, sp) == DATA_RECOV)
             return DATA_RECOV; 
 
-        printf("TFER=%s\n", TFER_DONE(sp) ? "done" : "not done");
-
         if (eof && TFER_DONE(sp))
             return SEND_EOF; 
     }
@@ -250,18 +252,19 @@ static STATE FSM_data_tx(int sock, Window* w, UDPInfo* udp, SParams* sp) {
 static STATE FSM_data_recov(int sock, Window* w, UDPInfo* udp, SParams* sp) {
     void* pack;
     int psize;
-    int timeout = MAX_ATTEMPTS;
+    int timeout = MAX_ATTEMPTS - 1;
+    bool timed_out = false;
 
     pack = get_packet(w, sp->srej_seq, &psize);
 
-    while(select_call(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT) && (timeout-- > 0)) {
-        send_rc_pack(pack, psize, sock, udp);
-    }
+    do {
+        send_rc_pack(pack, psize, sock, udp); 
+    } while((timed_out = select_call(sock, TIMEOUT_VALUE_S, 0, USE_TIMEOUT)) && (timeout-- > 0));
 
-    if (timeout == 0)
+    if (timed_out)
         return TERMINATE;
     
-    return process_rx(sock, w, udp, sp); // TODO confirm
+    return process_rx(sock, w, udp, sp);
 }
 
 static STATE FSM_send_eof(int sock, UDPInfo* udp, SParams* sp) {

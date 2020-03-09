@@ -51,15 +51,21 @@ int build_data_pack(void* buf, uint32_t seq, void* data, int len) {
 
 int build_rr_pack(void* buf, uint32_t seq) {
     g_last_pack = buf;
-    g_len = build_rc_header(seq, FLAG_RR, (RC_PHeader*)buf);
+    g_len = RC_RR_SIZE;
 
+    build_rc_header(seq, FLAG_RR, (RC_PHeader*)buf);
+    *((uint32_t*)(((RC_PHeader*)buf) + 1)) = htonl(seq);
+    
     return g_len;
 }
 
 int build_srej_pack(void* buf, uint32_t seq) {
     g_last_pack = buf;
-    g_len = build_rc_header(seq, FLAG_SREJ, (RC_PHeader*)buf);
+    g_len = RC_SREJ_SIZE;
 
+    build_rc_header(seq, FLAG_SREJ, (RC_PHeader*)buf);
+    *((uint32_t*)(((RC_PHeader*)buf) + 1)) = htonl(seq);
+ 
     return g_len;
 }
 

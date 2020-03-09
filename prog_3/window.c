@@ -134,7 +134,7 @@ int move_window_n(Window* w, int n) {
 int move_window_seq(Window* w, uint32_t rr) {
     int n;
 
-    if ((rr > w->cseq) || (rr <= w->lwseq)) {
+    if ((rr > w->cseq) || (rr < w->lwseq)) {
         DEBUG_PRINT("wndw: cannot move window to seq %d, lwseq = %d\n", rr, w->lwseq);
         return -1;
     }

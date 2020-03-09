@@ -47,15 +47,15 @@ int build_data_pack(void* buf, uint32_t seq, void* data, int len);
 void* parse_data_pack(void* buf, int psize, int* dsize);
 
 // Flag = 5 : RR
-// | header |
+// | header | RR# |
 #define FLAG_RR 5
-#define RC_RR_SIZE sizeof(RC_PHeader)
+#define RC_RR_SIZE sizeof(RC_PHeader) + 4
 int build_rr_pack(void*, uint32_t seq);
 
 // Flag = 6 : SREJ
-// | header |
+// | header | SREJ# |
 #define FLAG_SREJ 6
-#define RC_SREJ_SIZE sizeof(RC_PHeader)
+#define RC_SREJ_SIZE sizeof(RC_PHeader) + 4
 int build_srej_pack(void*, uint32_t seq);
 
 // Flag = 7 : Setup parameters (rcopy to server)
